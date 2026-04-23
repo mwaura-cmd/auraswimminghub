@@ -1,0 +1,21 @@
+{
+  "users": {
+    "fxajjlDG7raNMUDIcJhhs976zhR2": {
+      "uid": "fxajjlDG7raNMUDIcJhhs976zhR2",
+      "email": "auraswimminghub@gmail.com",
+      "role": "admin",
+      "displayName": "aura",
+      "childrenIds": [],
+      "createdAt": "2026-04-16T12:46:00.000Z"
+    },
+    "DzIFhbF6K3f3o9RJXsZhmOoJThe2": {
+      "uid": "DzIFhbF6K3f3o9RJXsZhmOoJThe2",
+      "email": "mwauradenis96@gmail.com",
+      "role": "instructor",
+      "displayName": "instructor",
+      "childrenIds": [],
+      "createdAt": "2026-04-16T12:46:00.000Z"
+    }
+  },
+  "bookings": {}
+}

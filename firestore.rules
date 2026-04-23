@@ -1,0 +1,67 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function hasRole(role) {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+    }
+
+    match /users/{uid} {
+      allow read, update: if isSignedIn() && request.auth.uid == uid;
+      allow create: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    match /bookings/{bookingId} {
+      allow create: if isSignedIn();
+      allow read: if isSignedIn();
+      allow update: if hasRole('admin') || hasRole('instructor');
+    }
+
+    match /sessions/{sessionId} {
+      allow read: if isSignedIn();
+      allow write: if hasRole('admin') || hasRole('instructor');
+    }
+
+    match /students/{studentId} {
+      allow read: if isSignedIn();
+      allow write: if hasRole('admin') || hasRole('instructor');
+    }
+
+    match /payments/{paymentId} {
+      allow read: if isSignedIn();
+      allow write: if hasRole('admin');
+    }
+
+    match /assessments/{assessmentId} {
+      allow read: if isSignedIn();
+      allow write: if hasRole('instructor') || hasRole('admin');
+    }
+
+    match /badges/{badgeId} {
+      allow read: if isSignedIn();
+      allow write: if hasRole('instructor') || hasRole('admin');
+    }
+
+    match /certificates/{certificateId} {
+      allow read: if isSignedIn();
+      allow write: if hasRole('admin');
+    }
+
+    match /resources/{resourceId} {
+      allow read: if isSignedIn();
+      allow write: if hasRole('admin') || hasRole('instructor');
+    }
+
+    match /notifications/{notificationId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

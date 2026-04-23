@@ -1,0 +1,24 @@
+{
+  "rules": {
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "bookings": {
+      ".read": "auth != null",
+      "$bookingId": {
+        ".write": "!data.exists() || auth != null",
+        ".validate": "!newData.exists() || (newData.hasChildren(['program', 'learnerGroup', 'billingCycle', 'amountKes', 'date', 'time', 'fullName', 'email', 'phone', 'learnerName', 'status', 'createdAt']) && newData.child('program').isString() && newData.child('program').val().matches(/^(Toddlers & Kids|Teens|Adults|Competitive Training|Water Treading Skills)$/) && newData.child('learnerGroup').isString() && newData.child('learnerGroup').val().matches(/^(Toddlers|Kids|Teens|Adults)$/) && newData.child('billingCycle').isString() && newData.child('billingCycle').val().matches(/^(daily|weekly|monthly)$/) && newData.child('amountKes').isNumber() && newData.child('amountKes').val() > 0 && newData.child('date').isString() && newData.child('time').isString() && newData.child('fullName').isString() && newData.child('email').isString() && newData.child('phone').isString() && newData.child('learnerName').isString() && (!newData.child('notes').exists() || newData.child('notes').isString()) && newData.child('status').isString() && newData.child('status').val().matches(/^(pending|paid|confirmed)$/) && newData.child('createdAt').isString() && (!newData.child('userId').exists() || newData.child('userId').isString() || newData.child('userId').val() == null) && (!newData.child('paystackReference').exists() || newData.child('paystackReference').isString()) && (!newData.child('attendanceStatus').exists() || (newData.child('attendanceStatus').isString() && newData.child('attendanceStatus').val().matches(/^(pending|present|absent)$/))) && (!newData.child('attendanceMarkedAt').exists() || newData.child('attendanceMarkedAt').isString()) && (!newData.child('attendanceMarkedByUid').exists() || newData.child('attendanceMarkedByUid').isString()) && (!newData.child('attendanceMarkedByUid').exists() || auth == null || newData.child('attendanceMarkedByUid').val() == auth.uid) && (auth != null || newData.child('status').val() == 'pending') && (auth != null || !newData.child('paystackReference').exists()) && (auth != null || !newData.child('userId').exists() || newData.child('userId').val() == null) && (auth != null || !newData.child('attendanceStatus').exists() || newData.child('attendanceStatus').val() == 'pending') && (auth != null || !newData.child('attendanceMarkedAt').exists()) && (auth != null || !newData.child('attendanceMarkedByUid').exists()))"
+      }
+    },
+    "gallery": {
+      ".read": true,
+      "$itemId": {
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'instructor')",
+        ".validate": "!newData.exists() || (newData.hasChildren(['caption', 'mediaUrl', 'mediaPath', 'mediaType', 'uploaderUid', 'uploaderRole', 'pinned', 'createdAt']) && newData.child('caption').isString() && newData.child('caption').val().length <= 240 && newData.child('mediaUrl').isString() && newData.child('mediaPath').isString() && newData.child('mediaType').isString() && newData.child('mediaType').val().matches(/^(image|video)$/) && newData.child('uploaderUid').isString() && newData.child('uploaderRole').isString() && newData.child('uploaderRole').val().matches(/^(admin|instructor)$/) && newData.child('pinned').isBoolean() && newData.child('createdAt').isString())"
+      }
+    }
+  }
+}

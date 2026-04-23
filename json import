@@ -1,0 +1,13 @@
+{
+  "users": {
+    "ZBMTXtwMMnMIAGv4vXLOTW8fWlg2": {
+      "uid": "ZBMTXtwMMnMIAGv4vXLOTW8fWlg2",
+      "email": "auraswimminghub@gmail.com",
+      "role": "admin",
+      "displayName": "aura",
+      "childrenIds": [],
+      "createdAt": "2026-04-16T00:00:00.000Z"
+    }
+  },
+  "bookings": {}
+}

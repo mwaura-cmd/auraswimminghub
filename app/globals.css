@@ -1,0 +1,196 @@
+@import "tailwindcss";
+
+:root {
+  --background: #030712;
+  --surface: #082f2e;
+  --surface-soft: rgba(19, 78, 74, 0.35);
+  --primary: #14b8a6;
+  --primary-strong: #0d9488;
+  --text: #f0fdfa;
+  --muted: #9ce7df;
+  --ring: rgba(20, 184, 166, 0.45);
+}
+
+@theme inline {
+  --color-aura-bg: var(--background);
+  --color-aura-text: var(--text);
+  --font-sans: var(--font-inter);
+  --font-heading: var(--font-space-grotesk);
+}
+
+* {
+  border-color: rgba(20, 184, 166, 0.2);
+}
+
+body {
+  background: radial-gradient(circle at 18% 20%, rgba(13, 148, 136, 0.2), transparent 42%),
+    radial-gradient(circle at 80% 0%, rgba(20, 184, 166, 0.18), transparent 34%),
+    linear-gradient(145deg, #02060e 0%, #03131a 55%, #021013 100%);
+  color: var(--text);
+  font-family: var(--font-inter), sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-space-grotesk), sans-serif;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+}
+
+.aura-bg::before {
+  content: "";
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  opacity: 0.23;
+  background-image: linear-gradient(rgba(20, 184, 166, 0.16) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(20, 184, 166, 0.12) 1px, transparent 1px);
+  background-size: 66px 66px;
+}
+
+.glass-card {
+  background: rgba(0, 0, 0, 0.8);
+  border: 1px solid rgba(20, 184, 166, 0.2);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 0 0 rgba(20, 184, 166, 0), inset 0 0 24px rgba(20, 184, 166, 0.06);
+  transition: box-shadow 220ms ease, border-color 220ms ease, transform 220ms ease;
+}
+
+.glass-card:hover {
+  border-color: rgba(20, 184, 166, 0.55);
+  box-shadow: 0 0 24px rgba(20, 184, 166, 0.28), inset 0 0 32px rgba(20, 184, 166, 0.1);
+  transform: translateY(-2px);
+}
+
+.btn-primary {
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-strong));
+  color: #031917;
+  font-weight: 700;
+  padding: 0.72rem 1.3rem;
+  transition: box-shadow 220ms ease, transform 220ms ease;
+}
+
+.btn-primary:hover {
+  box-shadow: 0 0 20px rgba(20, 184, 166, 0.5);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  border-radius: 999px;
+  border: 1px solid rgba(20, 184, 166, 0.65);
+  color: var(--primary);
+  font-weight: 600;
+  padding: 0.72rem 1.3rem;
+  background: rgba(6, 30, 34, 0.6);
+  transition: box-shadow 220ms ease, border-color 220ms ease;
+}
+
+.btn-secondary:hover {
+  border-color: rgba(20, 184, 166, 1);
+  box-shadow: 0 0 20px rgba(20, 184, 166, 0.35);
+}
+
+.section-shell {
+  margin-inline: auto;
+  width: min(1200px, calc(100% - 2rem));
+}
+
+.teal-ring {
+  box-shadow: 0 0 0 1px rgba(20, 184, 166, 0.25), 0 0 24px rgba(20, 184, 166, 0.2);
+}
+
+@keyframes aura-marquee-slide {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+
+  to {
+    transform: translate3d(-33.333333%, 0, 0);
+  }
+}
+
+@keyframes aura-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.aura-marquee-shell {
+  position: relative;
+  overflow: hidden;
+  padding-block: 0.25rem;
+}
+
+.aura-marquee-shell::before,
+.aura-marquee-shell::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: clamp(24px, 8vw, 120px);
+  z-index: 1;
+}
+
+.aura-marquee-shell::before {
+  left: 0;
+  background: linear-gradient(to right, rgba(2, 7, 18, 0.96), rgba(2, 7, 18, 0));
+}
+
+.aura-marquee-shell::after {
+  right: 0;
+  background: linear-gradient(to left, rgba(2, 7, 18, 0.96), rgba(2, 7, 18, 0));
+}
+
+.aura-marquee-track {
+  display: flex;
+  width: max-content;
+  gap: 1rem;
+  padding-inline: 1rem;
+  animation: aura-marquee-slide 34s linear infinite;
+  will-change: transform;
+}
+
+.aura-marquee-track-reverse {
+  animation-direction: reverse;
+  animation-duration: 39s;
+}
+
+.aura-marquee-shell:hover .aura-marquee-track {
+  animation-play-state: paused;
+}
+
+.aura-testimonial-card {
+  width: min(90vw, 370px);
+  border-radius: 1rem;
+  border: 1px solid rgba(20, 184, 166, 0.28);
+  background: linear-gradient(160deg, rgba(2, 6, 23, 0.9), rgba(8, 47, 46, 0.42));
+  padding: 1rem;
+  animation: aura-rise-in 650ms ease both;
+}
+
+@media (min-width: 768px) {
+  .aura-testimonial-card {
+    width: 370px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aura-marquee-track {
+    animation: none;
+    transform: translate3d(0, 0, 0);
+  }
+
+  .aura-testimonial-card {
+    animation: none;
+  }
+}
