@@ -26,6 +26,9 @@ export default function Home() {
             <Link className="btn-secondary" href="/programs">
               View Programs
             </Link>
+            <Link className="btn-secondary bg-teal-500/20 text-teal-50 border-teal-500/30 hover:bg-teal-500/30" href="/login">
+              Login to Portal
+            </Link>
           </div>
         </div>
       </section>
@@ -64,7 +67,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="section-shell mt-20">
+      <section id="pricing" className="section-shell mt-20">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
           <h2 className="text-3xl">Pricing</h2>
           <p className="text-sm text-teal-100/75">Per learner charges for daily, weekly, and monthly plans.</p>
@@ -124,7 +127,9 @@ export default function Home() {
 
       <HomeGalleryPreview />
 
-      <TestimonialsByAge />
+      <section id="testimonials">
+        <TestimonialsByAge />
+      </section>
 
       <section className="section-shell mt-20">
         <div className="rounded-3xl border border-teal-400/30 bg-black/70 px-8 py-16 text-center">

@@ -4,6 +4,7 @@ import "./globals.css";
 import { SiteNavbar } from "@/components/site-navbar";
 import { SiteFooter } from "@/components/site-footer";
 import { AuthProvider } from "@/components/providers/auth-provider";
+import { ScrollToTop } from "@/components/scroll-to-top";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -33,6 +34,7 @@ export default function RootLayout({
             <SiteNavbar />
             <main className="flex-1 pt-24">{children}</main>
             <SiteFooter />
+            <ScrollToTop />
           </div>
         </AuthProvider>
       </body>

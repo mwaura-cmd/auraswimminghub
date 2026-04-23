@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LogOut } from "lucide-react";
+import { LogOut, MoreVertical, X } from "lucide-react";
 import { signOut } from "firebase/auth";
 import { NAV_LINKS } from "@/lib/constants";
 import { clearDemoSession } from "@/lib/demo-auth";
@@ -16,9 +16,11 @@ export function SiteNavbar() {
   const router = useRouter();
   const { firebaseUser, isDemoMode } = useAuth();
   const [busy, setBusy] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleLogout = async () => {
     setBusy(true);
+    setIsMobileMenuOpen(false);
 
     try {
       if (isDemoMode) {
@@ -39,32 +41,47 @@ export function SiteNavbar() {
 
   return (
     <header className="fixed left-0 right-0 top-0 z-50 border-b border-teal-500/20 bg-black/70 backdrop-blur-xl">
-      <nav className="section-shell flex h-20 items-center justify-between gap-4">
-        <Link href="/" className="font-heading text-sm font-bold tracking-[0.3em] text-teal-100 md:text-base">
+      <nav className="section-shell flex h-20 items-center justify-between gap-4 relative">
+        <Link href="/" className="font-heading text-sm font-bold tracking-[0.3em] text-teal-100 md:text-base" onClick={() => setIsMobileMenuOpen(false)}>
           AURA SWIMMING HUB
         </Link>
-        {firebaseUser && (
+        
+        {/* Mobile controls */}
+        <div className="flex items-center gap-3 md:hidden">
+          {firebaseUser && (
+            <button
+              type="button"
+              onClick={handleLogout}
+              disabled={busy}
+              className="inline-flex items-center justify-center rounded-full border border-teal-500/30 bg-teal-500/10 p-2 text-teal-100 transition hover:bg-teal-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+              aria-label="Log out"
+              title="Log out"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          )}
           <button
             type="button"
-            onClick={handleLogout}
-            disabled={busy}
-            className="inline-flex items-center justify-center rounded-full border border-teal-500/30 bg-teal-500/10 p-2 text-teal-100 transition hover:bg-teal-500/20 disabled:cursor-not-allowed disabled:opacity-60 md:hidden"
-            aria-label="Log out"
-            title="Log out"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="inline-flex items-center justify-center rounded-full border border-teal-500/30 bg-teal-500/10 p-2 text-teal-100 transition hover:bg-teal-500/20"
+            aria-label="Toggle mobile menu"
           >
-            <LogOut className="h-4 w-4" />
+            {isMobileMenuOpen ? <X className="h-5 w-5" /> : <MoreVertical className="h-5 w-5" />}
           </button>
-        )}
+        </div>
+
+        {/* Desktop Links */}
         <div className="hidden items-center gap-2 md:flex">
           {visibleLinks.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               className={cn(
-                "rounded-full px-4 py-2 text-sm transition",
+                "rounded-full px-4 py-2 text-sm transition font-medium",
                 pathname === item.href
                   ? "bg-teal-500/25 text-teal-100 teal-ring"
                   : "text-teal-50/75 hover:bg-teal-500/15 hover:text-teal-50",
+                item.href === "/login" && "bg-teal-500/20 text-teal-50 hover:bg-teal-400/30" // Give login button a bit more emphasis
               )}
             >
               {item.label}
@@ -84,6 +101,28 @@ export function SiteNavbar() {
             </button>
           )}
         </div>
+
+        {/* Mobile Dropdown Menu */}
+        {isMobileMenuOpen && (
+          <div className="absolute top-full left-0 right-0 border-b border-teal-500/20 bg-black/95 p-4 shadow-2xl backdrop-blur-xl md:hidden flex flex-col gap-2">
+            {visibleLinks.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={cn(
+                  "rounded-xl px-4 py-3 text-base text-center transition font-medium",
+                  pathname === item.href
+                    ? "bg-teal-500/25 text-teal-100"
+                    : "text-teal-50/75 hover:bg-teal-500/15 hover:text-teal-50",
+                  item.href === "/login" && "bg-teal-500/20 text-teal-50 mt-2" 
+                )}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </div>
+        )}
       </nav>
     </header>
   );
