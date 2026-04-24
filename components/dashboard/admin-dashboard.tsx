@@ -195,32 +195,49 @@ export function AdminDashboard() {
         ) : bookings.length === 0 ? (
           <p className="mt-4 text-sm text-teal-50/70">No bookings yet.</p>
         ) : (
-          <div className="mt-4 overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="text-teal-200/85">
-                <tr>
-                  <th className="pb-2 pr-4">Learner</th>
-                  <th className="pb-2 pr-4">Program</th>
-                  <th className="pb-2 pr-4">Plan</th>
-                  <th className="pb-2 pr-4">Amount</th>
-                  <th className="pb-2 pr-4">Session</th>
-                  <th className="pb-2">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bookings.slice(0, 8).map((booking) => (
-                  <tr key={booking.id} className="border-t border-teal-500/20 text-teal-50/85">
-                    <td className="py-2 pr-4">{booking.learnerName}</td>
-                    <td className="py-2 pr-4">{booking.program}</td>
-                    <td className="py-2 pr-4 capitalize">{booking.billingCycle}</td>
-                    <td className="py-2 pr-4">{formatKes(booking.amountKes || 0)}</td>
-                    <td className="py-2 pr-4">{formatSessionDate(booking)} {booking.time}</td>
-                    <td className="py-2 capitalize">{booking.status}</td>
+          <>
+            <div className="mt-4 space-y-3 md:hidden">
+              {bookings.slice(0, 8).map((booking) => (
+                <div key={booking.id} className="rounded-xl border border-teal-500/25 bg-black/55 p-4 text-sm">
+                  <p className="font-semibold text-teal-50">{booking.learnerName}</p>
+                  <p className="mt-1 text-teal-100/80">{booking.program}</p>
+                  <p className="mt-1 text-teal-100/75">{formatSessionDate(booking)} {booking.time}</p>
+                  <div className="mt-3 flex items-center justify-between text-xs text-teal-100/80">
+                    <span className="capitalize">{booking.billingCycle}</span>
+                    <span>{formatKes(booking.amountKes || 0)}</span>
+                  </div>
+                  <p className="mt-2 text-xs uppercase tracking-[0.14em] text-teal-200/80">{booking.status}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 hidden overflow-x-auto md:block">
+              <table className="min-w-full text-left text-sm">
+                <thead className="text-teal-200/85">
+                  <tr>
+                    <th className="pb-2 pr-4">Learner</th>
+                    <th className="pb-2 pr-4">Program</th>
+                    <th className="pb-2 pr-4">Plan</th>
+                    <th className="pb-2 pr-4">Amount</th>
+                    <th className="pb-2 pr-4">Session</th>
+                    <th className="pb-2">Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {bookings.slice(0, 8).map((booking) => (
+                    <tr key={booking.id} className="border-t border-teal-500/20 text-teal-50/85">
+                      <td className="py-2 pr-4">{booking.learnerName}</td>
+                      <td className="py-2 pr-4">{booking.program}</td>
+                      <td className="py-2 pr-4 capitalize">{booking.billingCycle}</td>
+                      <td className="py-2 pr-4">{formatKes(booking.amountKes || 0)}</td>
+                      <td className="py-2 pr-4">{formatSessionDate(booking)} {booking.time}</td>
+                      <td className="py-2 capitalize">{booking.status}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </article>
 
@@ -235,30 +252,45 @@ export function AdminDashboard() {
         {galleryItems.length === 0 ? (
           <p className="mt-4 text-sm text-teal-50/70">No gallery items yet.</p>
         ) : (
-          <div className="mt-4 overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="text-teal-200/85">
-                <tr>
-                  <th className="pb-2 pr-4">Caption</th>
-                  <th className="pb-2 pr-4">Type</th>
-                  <th className="pb-2 pr-4">Uploader</th>
-                  <th className="pb-2 pr-4">Pinned</th>
-                  <th className="pb-2">Created</th>
-                </tr>
-              </thead>
-              <tbody>
-                {galleryItems.map((item) => (
-                  <tr key={item.id} className="border-t border-teal-500/20 text-teal-50/85">
-                    <td className="py-2 pr-4">{item.caption || "No caption"}</td>
-                    <td className="py-2 pr-4 capitalize">{item.mediaType}</td>
-                    <td className="py-2 pr-4 capitalize">{item.uploaderRole}</td>
-                    <td className="py-2 pr-4">{item.pinned ? "Yes" : "No"}</td>
-                    <td className="py-2">{new Date(item.createdAt).toLocaleDateString()}</td>
+          <>
+            <div className="mt-4 space-y-3 md:hidden">
+              {galleryItems.map((item) => (
+                <div key={item.id} className="rounded-xl border border-teal-500/25 bg-black/55 p-4 text-sm">
+                  <p className="font-semibold text-teal-50">{item.caption || "No caption"}</p>
+                  <p className="mt-1 capitalize text-teal-100/80">{item.mediaType} by {item.uploaderRole}</p>
+                  <div className="mt-2 flex items-center justify-between text-xs text-teal-100/75">
+                    <span>Pinned: {item.pinned ? "Yes" : "No"}</span>
+                    <span>{new Date(item.createdAt).toLocaleDateString()}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 hidden overflow-x-auto md:block">
+              <table className="min-w-full text-left text-sm">
+                <thead className="text-teal-200/85">
+                  <tr>
+                    <th className="pb-2 pr-4">Caption</th>
+                    <th className="pb-2 pr-4">Type</th>
+                    <th className="pb-2 pr-4">Uploader</th>
+                    <th className="pb-2 pr-4">Pinned</th>
+                    <th className="pb-2">Created</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {galleryItems.map((item) => (
+                    <tr key={item.id} className="border-t border-teal-500/20 text-teal-50/85">
+                      <td className="py-2 pr-4">{item.caption || "No caption"}</td>
+                      <td className="py-2 pr-4 capitalize">{item.mediaType}</td>
+                      <td className="py-2 pr-4 capitalize">{item.uploaderRole}</td>
+                      <td className="py-2 pr-4">{item.pinned ? "Yes" : "No"}</td>
+                      <td className="py-2">{new Date(item.createdAt).toLocaleDateString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </article>
     </div>

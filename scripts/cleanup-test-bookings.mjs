@@ -7,6 +7,7 @@ const TEST_NAME_PATTERNS = [/^streak\s+(seed|test)/i, /\be2e\b/i, /^test learner
 function parseArgs(argv) {
   return {
     apply: argv.includes("--apply"),
+    all: argv.includes("--all"),
   };
 }
 
@@ -72,7 +73,7 @@ function getAdminApp() {
 }
 
 async function run() {
-  const { apply } = parseArgs(process.argv.slice(2));
+  const { apply, all } = parseArgs(process.argv.slice(2));
   await loadEnvFromDotLocal();
 
   const app = getAdminApp();
@@ -88,14 +89,14 @@ async function run() {
   const data = snapshot.val();
   const entries = Object.entries(data).map(([id, booking]) => ({ id, booking }));
 
-  const matches = entries.filter(({ booking }) => isTemporaryTestBooking(booking));
+  const matches = all ? entries : entries.filter(({ booking }) => isTemporaryTestBooking(booking));
 
   if (matches.length === 0) {
-    console.log("No temporary test bookings matched cleanup patterns.");
+    console.log(all ? "No bookings found to delete." : "No temporary test bookings matched cleanup patterns.");
     return;
   }
 
-  console.log(`Matched ${matches.length} temporary test booking(s):`);
+  console.log(all ? `Matched ${matches.length} booking(s) for full cleanup:` : `Matched ${matches.length} temporary test booking(s):`);
   for (const { id, booking } of matches) {
     const learner = booking.learnerName ?? "(unknown learner)";
     const when = `${booking.date ?? "?"} ${booking.time ?? "?"}`;

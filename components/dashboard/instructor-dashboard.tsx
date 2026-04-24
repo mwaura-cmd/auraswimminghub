@@ -275,7 +275,24 @@ export function InstructorDashboard() {
 
       <article className="glass-card rounded-2xl p-6 lg:col-span-3">
         <h2 className="text-lg">Student Directory</h2>
-        <div className="mt-4 overflow-x-auto">
+        <div className="mt-4 space-y-3 md:hidden">
+          {learnerDirectory.length === 0 && (
+            <div className="rounded-xl border border-teal-500/25 bg-black/55 p-4 text-sm text-teal-50/75">No learners found yet.</div>
+          )}
+
+          {learnerDirectory.map((row) => (
+            <div key={`${row.name}-${row.phone}`} className="rounded-xl border border-teal-500/25 bg-black/55 p-4 text-sm">
+              <p className="font-semibold text-teal-50">{row.name}</p>
+              <p className="mt-1 text-teal-100/80">{row.program}</p>
+              <p className="mt-1 text-teal-100/75">{row.phone}</p>
+              <p className="mt-2 text-xs text-teal-100/70">Sessions booked: {row.sessions}</p>
+              <p className="mt-1 text-xs text-teal-100/70">Latest: {row.latestSessionLabel}</p>
+              <button className="btn-secondary mt-3 w-full text-xs">Open profile</button>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-4 hidden overflow-x-auto md:block">
           <table className="w-full min-w-[680px] text-left text-sm">
             <thead className="text-teal-200/80">
               <tr>
@@ -330,7 +347,58 @@ export function InstructorDashboard() {
           </p>
         )}
 
-        <div className="mt-4 overflow-x-auto">
+        <div className="mt-4 space-y-3 md:hidden">
+          {attendanceQueue.length === 0 && (
+            <div className="rounded-xl border border-teal-500/25 bg-black/55 p-4 text-sm text-teal-50/75">
+              No scheduled classes in queue.
+            </div>
+          )}
+
+          {attendanceQueue.map((item) => {
+            const sessionTime = item.sessionDate?.getTime() ?? 0;
+            const canMarkNow = sessionTime <= Date.now();
+            const attendanceStatus = toAttendanceStatus(item.booking.attendanceStatus);
+            const statusTone =
+              attendanceStatus === "present"
+                ? "bg-emerald-500/20 text-emerald-200"
+                : attendanceStatus === "absent"
+                  ? "bg-rose-500/20 text-rose-200"
+                  : "bg-amber-500/20 text-amber-200";
+
+            return (
+              <div key={item.booking.id} className="rounded-xl border border-teal-500/25 bg-black/55 p-4 text-sm">
+                <p className="font-semibold text-teal-50">{item.booking.learnerName}</p>
+                <p className="mt-1 text-teal-100/80">{item.booking.program}</p>
+                <p className="mt-1 text-teal-100/75">{formatSessionDate(item.booking)} {formatSessionTime(item.booking)}</p>
+                <div className="mt-2 flex items-center justify-between">
+                  <span className="text-xs capitalize text-teal-100/70">{item.booking.status}</span>
+                  <span className={`rounded-full px-3 py-1 text-xs uppercase ${statusTone}`}>{attendanceStatus}</span>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    className="btn-secondary text-xs"
+                    disabled={attendanceBusyId === item.booking.id || !canMarkNow || attendanceStatus === "present"}
+                    onClick={() => void handleMarkAttendance(item.booking.id, "present")}
+                  >
+                    {attendanceBusyId === item.booking.id ? "Saving..." : "Present"}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary text-xs"
+                    disabled={attendanceBusyId === item.booking.id || !canMarkNow || attendanceStatus === "absent"}
+                    onClick={() => void handleMarkAttendance(item.booking.id, "absent")}
+                  >
+                    Absent
+                  </button>
+                </div>
+                {!canMarkNow && <p className="mt-2 text-xs text-teal-100/65">Available after scheduled session time.</p>}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-4 hidden overflow-x-auto md:block">
           <table className="w-full min-w-[860px] text-left text-sm">
             <thead className="text-teal-200/80">
               <tr>

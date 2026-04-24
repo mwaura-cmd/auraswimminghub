@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from "firebase/auth";
+import {
+  GoogleAuthProvider,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  updateProfile,
+} from "firebase/auth";
 import { auth, isFirebaseConfigured, rtdb } from "@/lib/firebase";
 import { DEMO_ACCOUNTS, findDemoAccount, setDemoSession } from "@/lib/demo-auth";
 import { ensureUserProfile, getUserProfile } from "@/lib/realtimedb";
@@ -55,6 +61,18 @@ function toAuthErrorMessage(error: unknown) {
     return "Invalid email or password.";
   }
 
+  if (code === "auth/popup-closed-by-user") {
+    return "Google sign-in was cancelled before completion.";
+  }
+
+  if (code === "auth/popup-blocked") {
+    return "Browser blocked the Google sign-in popup. Allow popups and retry.";
+  }
+
+  if (code === "auth/unauthorized-domain") {
+    return "This domain is not authorized in Firebase Authentication settings.";
+  }
+
   const message = error instanceof Error ? error.message : "Authentication failed";
   if (message.toUpperCase().includes("PERMISSION_DENIED")) {
     return "Realtime Database denied access to your profile. Update RTDB rules to allow authenticated users to read users/{uid}.";
@@ -83,6 +101,43 @@ export function AuthForm() {
   const router = useRouter();
   const isDemoMode = !isFirebaseConfigured || !auth || !rtdb;
   const isPublicSignup = mode === "signup" && !isDemoMode;
+
+  const onGoogleSignIn = async () => {
+    setError("");
+    setBusy(true);
+
+    try {
+      if (isDemoMode) {
+        throw new Error("Google sign-in is unavailable in demo mode.");
+      }
+
+      const firebaseAuth = auth!;
+      const provider = new GoogleAuthProvider();
+      const credential = await signInWithPopup(firebaseAuth, provider);
+
+      // Wait for auth token propagation before role/profile lookups.
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      let profile = await withRetry(() => withTimeout(getUserProfile(credential.user.uid)));
+      let profileRole = normalizeRole(profile?.role);
+
+      if (!profileRole) {
+        try {
+          await withTimeout(ensureUserProfile("student", { displayName: credential.user.displayName ?? "" }));
+          profile = await withRetry(() => withTimeout(getUserProfile(credential.user.uid)));
+          profileRole = normalizeRole(profile?.role) ?? "student";
+        } catch {
+          profileRole = "student";
+        }
+      }
+
+      router.push(ROLE_ROUTES[profileRole]);
+    } catch (err) {
+      setError(toAuthErrorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -215,6 +270,12 @@ export function AuthForm() {
         <button className="btn-primary w-full" disabled={busy} type="submit">
           {busy ? "Please wait..." : isDemoMode ? "Login to Demo" : mode === "login" ? "Login" : "Create account"}
         </button>
+
+        {!isDemoMode && (
+          <button type="button" className="btn-secondary w-full" onClick={() => void onGoogleSignIn()} disabled={busy}>
+            Continue with Google
+          </button>
+        )}
 
         {!isDemoMode && (
           <button
