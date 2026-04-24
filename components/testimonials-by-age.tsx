@@ -60,11 +60,9 @@ const TESTIMONIALS_BY_AGE = [
 export function TestimonialsByAge() {
   return (
     <section className="mt-20">
-      <div className="section-shell mb-8 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-xs uppercase tracking-[0.25em] text-teal-300">Testimonials</p>
-          <h2 className="mt-2 text-3xl">What Our Swimmers Say</h2>
-        </div>
+      <div className="section-shell mb-8">
+        <p className="text-xs uppercase tracking-[0.25em] text-teal-300">Testimonials</p>
+        <h2 className="mt-2 text-3xl">What Our Swimmers Say</h2>
       </div>
 
       <div className="space-y-6">
