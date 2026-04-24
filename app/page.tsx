@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Image from "next/image";
 import { ArrowRight, ShieldCheck, Trophy, Waves, TimerReset, Dumbbell } from "lucide-react";
 import { HomeGalleryPreview } from "@/components/home-gallery-preview";
 import { MountainBreezeMap } from "@/components/mountain-breeze-map";
@@ -12,17 +11,6 @@ export default function Home() {
   return (
     <div className="pb-20">
       <section className="section-shell relative overflow-hidden rounded-3xl border border-teal-500/30 bg-black/70 px-6 py-24 md:px-14">
-        <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center">
-          <div className="relative h-[78%] w-[78%] max-w-3xl opacity-20 md:opacity-25">
-            <Image
-              src="/brand-logo.png"
-              alt="Aura Swimming Hub logo background"
-              fill
-              className="object-contain"
-              priority
-            />
-          </div>
-        </div>
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(20,184,166,0.2),_transparent_45%),linear-gradient(110deg,rgba(3,7,18,0.25),rgba(3,7,18,0.9))]" />
         <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-teal-500/15 blur-3xl" />
         <div className="relative mx-auto max-w-4xl text-center">

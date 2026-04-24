@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { LogOut, MoreVertical, X } from "lucide-react";
 import { signOut } from "firebase/auth";
@@ -42,8 +43,16 @@ export function SiteNavbar() {
   return (
     <header className="fixed left-0 right-0 top-0 z-50 border-b border-teal-500/20 bg-black/70 backdrop-blur-xl">
       <nav className="section-shell flex h-20 items-center justify-between gap-4 relative">
-        <Link href="/" className="font-heading text-sm font-bold tracking-[0.3em] text-teal-100 md:text-base" onClick={() => setIsMobileMenuOpen(false)}>
-          AURA SWIMMING HUB
+        <Link href="/" className="inline-flex items-center gap-3 font-heading text-sm font-bold tracking-[0.3em] text-teal-100 md:text-base" onClick={() => setIsMobileMenuOpen(false)}>
+          <Image
+            src="/brand-logo.png"
+            alt="Aura Swimming Hub logo"
+            width={34}
+            height={34}
+            className="h-8 w-8 rounded-md object-cover ring-1 ring-teal-500/30"
+            priority
+          />
+          <span>AURA SWIMMING HUB</span>
         </Link>
         
         {/* Mobile controls */}
