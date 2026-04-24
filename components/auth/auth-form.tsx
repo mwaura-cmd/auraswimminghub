@@ -100,7 +100,6 @@ export function AuthForm() {
   const [error, setError] = useState("");
   const router = useRouter();
   const isDemoMode = !isFirebaseConfigured || !auth || !rtdb;
-  const isPublicSignup = mode === "signup" && !isDemoMode;
 
   const onGoogleSignIn = async () => {
     setError("");
@@ -244,12 +243,6 @@ export function AuthForm() {
             <option value="student">student</option>
             <option value="parent">parent</option>
           </select>
-        )}
-
-        {isPublicSignup && (
-          <p className="text-xs text-teal-100/70">
-            Instructor and admin accounts are provisioned by academy administrators.
-          </p>
         )}
 
         {isDemoMode && (

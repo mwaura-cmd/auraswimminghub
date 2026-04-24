@@ -65,7 +65,6 @@ export function TestimonialsByAge() {
           <p className="text-xs uppercase tracking-[0.25em] text-teal-300">Testimonials</p>
           <h2 className="mt-2 text-3xl">What Our Swimmers Say</h2>
         </div>
-        <p className="text-sm text-teal-100/75">Age-group lanes moving end to end for a modern vibe.</p>
       </div>
 
       <div className="space-y-6">
