@@ -13,6 +13,24 @@ export interface SwimmerProfile {
   updatedAt?: string;
 }
 
+export interface WorkoutCardItem {
+  description: string;
+  distance?: string;
+  duration?: string;
+  reps?: number;
+}
+
+export interface GeneratedWorkout {
+  workout_title: string;
+  focus: string;
+  warm_up: WorkoutCardItem[];
+  main_set: WorkoutCardItem[];
+  treading_drills: WorkoutCardItem[];
+  cool_down: WorkoutCardItem[];
+  requestedMinutes?: number;
+  estimatedMinutes?: number;
+}
+
 export type ProgramType =
   | "Toddlers & Kids"
   | "Teens"

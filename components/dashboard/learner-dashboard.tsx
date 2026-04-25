@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Trophy, CalendarDays, ReceiptText, Clock3 } from "lucide-react";
+import { Check, LoaderCircle, Trophy, CalendarDays, ReceiptText, Clock3, Sparkles } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { useAuth } from "@/components/providers/auth-provider";
 import { formatSessionDate, formatSessionTime, getSessionDate, isUpcomingBooking } from "@/lib/booking-utils";
 import { BILLING_CYCLES, BILLING_CYCLE_LABEL, formatKes } from "@/lib/pricing";
 import { subscribeBookings, subscribeUserProfile } from "@/lib/realtimedb";
-import { AttendanceStatus, Booking, PlatformUser } from "@/lib/types";
+import { auth } from "@/lib/firebase";
+import { AttendanceStatus, Booking, GeneratedWorkout, PlatformUser } from "@/lib/types";
 
 function toAttendanceStatus(status?: AttendanceStatus): AttendanceStatus {
   return status ?? "pending";
@@ -35,6 +36,10 @@ export function LearnerDashboard() {
   const { firebaseUser } = useAuth();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [profile, setProfile] = useState<PlatformUser | null>(null);
+  const [workout, setWorkout] = useState<GeneratedWorkout | null>(null);
+  const [workoutBusy, setWorkoutBusy] = useState(false);
+  const [workoutError, setWorkoutError] = useState("");
+  const [completedItems, setCompletedItems] = useState<Record<string, boolean>>({});
   const [bookingError, setBookingError] = useState("");
   const [profileError, setProfileError] = useState("");
   const [clockTick, setClockTick] = useState(() => Date.now());
@@ -239,6 +244,123 @@ export function LearnerDashboard() {
     return "Level 1 - New";
   }, [bookings.length, profile?.swimmerProfile?.level]);
 
+  const allocatedTrainingMinutes = Math.min(profile?.swimmerProfile?.sessionTimeLimitMinutes ?? 40, 60);
+
+  const workoutCompletion = useMemo(() => {
+    if (!workout) {
+      return 0;
+    }
+
+    const items = [
+      ...workout.warm_up,
+      ...workout.main_set,
+      ...workout.treading_drills,
+      ...workout.cool_down,
+    ];
+
+    if (items.length === 0) {
+      return 0;
+    }
+
+    const completed = items.filter((item) => completedItems[item.description]).length;
+    return Math.round((completed / items.length) * 100);
+  }, [completedItems, workout]);
+
+  const handleGenerateWorkout = async () => {
+    setWorkoutBusy(true);
+    setWorkoutError("");
+
+    try {
+      const currentAuth = auth;
+      const currentUser = currentAuth?.currentUser;
+
+      if (!currentAuth || !currentUser) {
+        throw new Error("You must be signed in to generate a set.");
+      }
+
+      const token = await currentUser.getIdToken();
+      const response = await fetch("/api/generate-set", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ requestedMinutes: allocatedTrainingMinutes }),
+      });
+
+      const data = (await response.json()) as {
+        workout?: GeneratedWorkout;
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "Could not generate today's set.");
+      }
+
+      setWorkout(data.workout ?? null);
+      setCompletedItems({});
+    } catch (error) {
+      setWorkoutError(error instanceof Error ? error.message : "Could not generate today's set.");
+    } finally {
+      setWorkoutBusy(false);
+    }
+  };
+
+  const toggleWorkoutItem = (itemKey: string) => {
+    setCompletedItems((current) => ({
+      ...current,
+      [itemKey]: !current[itemKey],
+    }));
+  };
+
+  const renderWorkoutSection = (title: string, items: { description: string; distance?: string; duration?: string; reps?: number }[], tone: string) => {
+    if (items.length === 0) {
+      return null;
+    }
+
+    return (
+      <section className="rounded-2xl border border-teal-500/20 bg-black/50 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-sm uppercase tracking-[0.24em] text-teal-100/75">{title}</h3>
+          <span className={`rounded-full px-3 py-1 text-xs ${tone}`}>{items.length} sets</span>
+        </div>
+        <div className="mt-4 space-y-3">
+          {items.map((item, index) => {
+            const itemKey = `${title}-${item.description}-${index}`;
+            const isChecked = Boolean(completedItems[itemKey]);
+
+            return (
+              <label
+                key={itemKey}
+                className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition ${
+                  isChecked ? "border-emerald-500/30 bg-emerald-500/10" : "border-teal-500/20 bg-black/40 hover:border-teal-400/40"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={isChecked}
+                  onChange={() => toggleWorkoutItem(itemKey)}
+                  className="mt-1 h-4 w-4 rounded border-teal-500/40 bg-transparent text-teal-400"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium text-teal-50">{item.description}</p>
+                    {isChecked && <Check className="h-4 w-4 text-emerald-300" />}
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-2 text-xs text-teal-100/70">
+                    {item.distance && <span className="rounded-full bg-white/5 px-2 py-1">{item.distance}</span>}
+                    {item.duration && <span className="rounded-full bg-white/5 px-2 py-1">{item.duration}</span>}
+                    {typeof item.reps === "number" && <span className="rounded-full bg-white/5 px-2 py-1">{item.reps} reps</span>}
+                  </div>
+                </div>
+              </label>
+            );
+          })}
+        </div>
+      </section>
+    );
+  };
+
   return (
     <div className="section-shell grid gap-4 pb-20 lg:grid-cols-3">
       <article className="glass-card rounded-2xl p-6 lg:col-span-2">
@@ -281,6 +403,63 @@ export function LearnerDashboard() {
               </p>
             </div>
           </div>
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-teal-500/25 bg-[linear-gradient(180deg,rgba(8,47,73,0.65),rgba(0,0,0,0.45))] p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.24em] text-teal-300">AI Training Set</p>
+              <h2 className="mt-1 text-2xl">Generate Today&apos;s Set</h2>
+              <p className="mt-2 max-w-2xl text-sm text-teal-50/75">
+                Your daily set is tailored to your swimmer profile and capped to your allocated coaching time of {allocatedTrainingMinutes} minutes.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void handleGenerateWorkout()}
+              disabled={workoutBusy}
+              className="inline-flex items-center gap-2 rounded-full bg-teal-400 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-teal-300 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {workoutBusy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              {workoutBusy ? "Generating..." : "Generate Today's Set"}
+            </button>
+          </div>
+
+          {workoutError && (
+            <p className="mt-4 rounded-xl border border-rose-500/40 bg-rose-900/20 p-3 text-sm text-rose-200">{workoutError}</p>
+          )}
+
+          {workout && (
+            <div className="mt-5 space-y-4">
+              <div className="rounded-2xl border border-teal-500/20 bg-black/40 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.24em] text-teal-300">Workout Title</p>
+                    <h3 className="mt-1 text-xl text-teal-50">{workout.workout_title}</h3>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs uppercase tracking-[0.24em] text-teal-300">Focus</p>
+                    <p className="mt-1 text-sm text-teal-50/85">{workout.focus}</p>
+                  </div>
+                </div>
+                <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
+                  <div className="h-full rounded-full bg-teal-400 transition-all" style={{ width: `${Math.min(workoutCompletion, 100)}%` }} />
+                </div>
+                <p className="mt-2 text-xs text-teal-100/70">{workoutCompletion}% completed</p>
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-2">
+                {renderWorkoutSection("Warm-up", workout.warm_up, "bg-cyan-500/15 text-cyan-100")}
+                {renderWorkoutSection("Main Set", workout.main_set, "bg-teal-500/15 text-teal-100")}
+                {renderWorkoutSection("Water Treading / Survival", workout.treading_drills, "bg-sky-500/15 text-sky-100")}
+                {renderWorkoutSection("Cool-down", workout.cool_down, "bg-slate-500/15 text-slate-100")}
+              </div>
+
+              <div className="rounded-2xl border border-teal-500/20 bg-black/40 p-4 text-sm text-teal-50/80">
+                Estimated duration: <span className="font-semibold text-teal-50">{workout.estimatedMinutes ?? allocatedTrainingMinutes} min</span>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
