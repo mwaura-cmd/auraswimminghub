@@ -99,6 +99,8 @@ const COACH_SYSTEM_PROMPT = [
   "Use the provided JSON schema exactly. Do not add extra keys.",
 ].join(" ");
 
+const OPENAI_TIMEOUT_MS = 25000;
+
 function parseBearerToken(request: NextRequest): string | null {
   const header = request.headers.get("authorization") ?? request.headers.get("Authorization");
   if (!header || !header.toLowerCase().startsWith("bearer ")) {
@@ -238,65 +240,82 @@ async function fetchWorkoutFromLlm(input: {
 
   const model = process.env.OPENAI_MODEL?.trim() || "gpt-4.1-mini";
 
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      temperature: 0.4,
-      response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: WORKOUT_JSON_SCHEMA.name,
-          strict: true,
-          schema: WORKOUT_JSON_SCHEMA.schema,
-        },
-      },
-      messages: [
-        {
-          role: "system",
-          content: COACH_SYSTEM_PROMPT,
-        },
-        {
-          role: "user",
-          content: JSON.stringify({
-            requested_minutes: input.requestedMinutes,
-            swimmer_profile: input.swimmerProfile ?? null,
-            booking_history: input.history,
-          }),
-        },
-      ],
-    }),
-  });
-
-  const payload = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string | null } }>;
-    error?: { message?: string };
-  };
-
-  if (!response.ok) {
-    throw new Error(payload.error?.message ?? "LLM request failed");
-  }
-
-  const content = payload.choices?.[0]?.message?.content;
-  if (!content) {
-    throw new Error("LLM returned empty content");
-  }
+  const controller = new AbortController();
+  const timeoutHandle = setTimeout(() => {
+    controller.abort();
+  }, OPENAI_TIMEOUT_MS);
 
   try {
-    const parsed = JSON.parse(content) as Record<string, unknown>;
-    const normalized = normalizeWorkout(parsed, input.requestedMinutes);
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model,
+        temperature: 0.4,
+        max_completion_tokens: 1200,
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: WORKOUT_JSON_SCHEMA.name,
+            strict: true,
+            schema: WORKOUT_JSON_SCHEMA.schema,
+          },
+        },
+        messages: [
+          {
+            role: "system",
+            content: COACH_SYSTEM_PROMPT,
+          },
+          {
+            role: "user",
+            content: JSON.stringify({
+              requested_minutes: input.requestedMinutes,
+              swimmer_profile: input.swimmerProfile ?? null,
+              booking_history: input.history,
+            }),
+          },
+        ],
+      }),
+    });
 
-    if (normalized.estimatedMinutes > 60) {
-      throw new Error("Generated workout exceeds the 60 minute session cap");
+    const payload = (await response.json()) as {
+      choices?: Array<{ message?: { content?: string | null } }>;
+      error?: { message?: string };
+    };
+
+    if (!response.ok) {
+      throw new Error(payload.error?.message ?? "LLM request failed");
     }
 
-    return normalized;
-  } catch {
-    throw new Error("LLM response was not valid JSON");
+    const content = payload.choices?.[0]?.message?.content;
+    if (!content) {
+      throw new Error("LLM returned empty content");
+    }
+
+    try {
+      const parsed = JSON.parse(content) as Record<string, unknown>;
+      const normalized = normalizeWorkout(parsed, input.requestedMinutes);
+
+      if (normalized.estimatedMinutes > 60) {
+        throw new Error("Generated workout exceeds the 60 minute session cap");
+      }
+
+      return normalized;
+    } catch {
+      throw new Error("LLM response was not valid JSON");
+    }
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("AI generation timed out. Please try again.");
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeoutHandle);
   }
 }
 

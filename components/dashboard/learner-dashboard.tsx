@@ -319,6 +319,7 @@ export function LearnerDashboard() {
   const handleGenerateWorkout = async () => {
     setWorkoutBusy(true);
     setWorkoutError("");
+    let timeoutHandle: number | undefined;
 
     try {
       const currentAuth = auth;
@@ -329,12 +330,18 @@ export function LearnerDashboard() {
       }
 
       const token = await currentUser.getIdToken();
+      const controller = new AbortController();
+      timeoutHandle = window.setTimeout(() => {
+        controller.abort();
+      }, 30000);
+
       const response = await fetch("/api/generate-set", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
+        signal: controller.signal,
         body: JSON.stringify({
           requestedMinutes: manualSwimmerProfile?.sessionTimeLimitMinutes ?? 40,
           swimmerProfile: manualSwimmerProfile,
@@ -353,8 +360,15 @@ export function LearnerDashboard() {
       setWorkout(data.workout ?? null);
       setCompletedItems({});
     } catch (error) {
-      setWorkoutError(error instanceof Error ? error.message : "Could not generate today's set.");
+      if (error instanceof Error && error.name === "AbortError") {
+        setWorkoutError("Generation took too long. Please try again.");
+      } else {
+        setWorkoutError(error instanceof Error ? error.message : "Could not generate today's set.");
+      }
     } finally {
+      if (typeof timeoutHandle === "number") {
+        window.clearTimeout(timeoutHandle);
+      }
       setWorkoutBusy(false);
     }
   };
