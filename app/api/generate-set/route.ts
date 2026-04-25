@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminAuth, getAdminRtdb } from "@/lib/firebase-admin";
-import { Booking, PlatformUser } from "@/lib/types";
+import { Booking, PlatformUser, SwimmerProfile } from "@/lib/types";
 
 type GenerateSetRequest = {
   requestedMinutes?: number;
+  swimmerProfile?: Partial<SwimmerProfile>;
 };
 
 type WorkoutCardItem = {
@@ -117,6 +118,45 @@ function clampTrainingMinutes(input?: number): number {
   return Math.max(15, Math.min(60, parsed));
 }
 
+function normalizeSwimmerProfile(input?: Partial<SwimmerProfile>): SwimmerProfile | null {
+  if (!input) {
+    return null;
+  }
+
+  const level = typeof input.level === "string" && input.level.trim() ? input.level.trim() : "";
+  const waterTreadingCapabilitySeconds = Number(input.waterTreadingCapabilitySeconds);
+  const fearOfDeepWater = typeof input.fearOfDeepWater === "boolean" ? input.fearOfDeepWater : null;
+  const fitnessGoals = Array.isArray(input.fitnessGoals)
+    ? input.fitnessGoals.map((goal) => String(goal).trim()).filter(Boolean)
+    : [];
+  const preferredStrokes = Array.isArray(input.preferredStrokes)
+    ? input.preferredStrokes.map((stroke) => String(stroke).trim()).filter(Boolean)
+    : [];
+  const sessionTimeLimitMinutes = Number(input.sessionTimeLimitMinutes);
+  const notes = typeof input.notes === "string" ? input.notes.trim() : "";
+
+  if (
+    !level ||
+    !Number.isFinite(waterTreadingCapabilitySeconds) ||
+    fearOfDeepWater === null ||
+    fitnessGoals.length === 0 ||
+    preferredStrokes.length === 0 ||
+    !Number.isFinite(sessionTimeLimitMinutes)
+  ) {
+    return null;
+  }
+
+  return {
+    level: level as SwimmerProfile["level"],
+    waterTreadingCapabilitySeconds: Math.max(0, Math.round(waterTreadingCapabilitySeconds)),
+    fearOfDeepWater,
+    fitnessGoals,
+    preferredStrokes,
+    sessionTimeLimitMinutes: Math.max(15, Math.min(60, Math.round(sessionTimeLimitMinutes))),
+    ...(notes ? { notes } : {}),
+  };
+}
+
 function estimateTotalTimeMinutes(workout: Record<string, unknown>) {
   const sections = ["warm_up", "main_set", "treading_drills", "cool_down"] as const;
   const rawTotal = sections.reduce((sum, section) => {
@@ -188,7 +228,7 @@ function summarizeBookingHistory(bookings: Booking[]) {
 
 async function fetchWorkoutFromLlm(input: {
   requestedMinutes: number;
-  profile: PlatformUser | null;
+  swimmerProfile: SwimmerProfile | null;
   history: ReturnType<typeof summarizeBookingHistory>;
 }): Promise<GeneratedWorkout> {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -197,8 +237,6 @@ async function fetchWorkoutFromLlm(input: {
   }
 
   const model = process.env.OPENAI_MODEL?.trim() || "gpt-4.1-mini";
-
-  const swimmerProfile = input.profile?.swimmerProfile;
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -226,7 +264,7 @@ async function fetchWorkoutFromLlm(input: {
           role: "user",
           content: JSON.stringify({
             requested_minutes: input.requestedMinutes,
-            swimmer_profile: swimmerProfile ?? null,
+            swimmer_profile: input.swimmerProfile ?? null,
             booking_history: input.history,
           }),
         },
@@ -282,9 +320,12 @@ export async function POST(request: NextRequest) {
 
     const body = (await request.json().catch(() => ({}))) as GenerateSetRequest;
     const requestedMinutes = clampTrainingMinutes(body.requestedMinutes);
+    const manualProfile = normalizeSwimmerProfile(body.swimmerProfile);
 
     const profileSnapshot = await adminRtdb.ref(`users/${uid}`).get();
     const profile = profileSnapshot.exists() ? (profileSnapshot.val() as PlatformUser) : null;
+
+    const resolvedSwimmerProfile = manualProfile ?? profile?.swimmerProfile ?? null;
 
     const bookingsSnapshot = await adminRtdb.ref("bookings").get();
     const bookingData = bookingsSnapshot.exists()
@@ -303,7 +344,7 @@ export async function POST(request: NextRequest) {
 
     const workout = await fetchWorkoutFromLlm({
       requestedMinutes,
-      profile,
+      swimmerProfile: resolvedSwimmerProfile,
       history,
     });
 

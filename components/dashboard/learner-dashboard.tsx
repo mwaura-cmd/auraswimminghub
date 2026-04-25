@@ -9,7 +9,7 @@ import { formatSessionDate, formatSessionTime, getSessionDate, isUpcomingBooking
 import { BILLING_CYCLES, BILLING_CYCLE_LABEL, formatKes } from "@/lib/pricing";
 import { subscribeBookings, subscribeUserProfile } from "@/lib/realtimedb";
 import { auth } from "@/lib/firebase";
-import { AttendanceStatus, Booking, GeneratedWorkout, PlatformUser } from "@/lib/types";
+import { AttendanceStatus, Booking, GeneratedWorkout, PlatformUser, SwimLevel, SwimmerProfile } from "@/lib/types";
 
 function toAttendanceStatus(status?: AttendanceStatus): AttendanceStatus {
   return status ?? "pending";
@@ -37,7 +37,13 @@ export function LearnerDashboard() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [profile, setProfile] = useState<PlatformUser | null>(null);
   const [workout, setWorkout] = useState<GeneratedWorkout | null>(null);
-  const [requestedWorkoutMinutes, setRequestedWorkoutMinutes] = useState(40);
+  const [manualLevel, setManualLevel] = useState<SwimLevel | "">("");
+  const [manualWaterTreadingSeconds, setManualWaterTreadingSeconds] = useState("");
+  const [manualDeepWaterConfidence, setManualDeepWaterConfidence] = useState<"" | "true" | "false">("");
+  const [manualFitnessGoals, setManualFitnessGoals] = useState("");
+  const [manualPreferredStrokes, setManualPreferredStrokes] = useState("");
+  const [manualSessionMinutes, setManualSessionMinutes] = useState("");
+  const [manualNotes, setManualNotes] = useState("");
   const [workoutBusy, setWorkoutBusy] = useState(false);
   const [workoutError, setWorkoutError] = useState("");
   const [completedItems, setCompletedItems] = useState<Record<string, boolean>>({});
@@ -245,12 +251,50 @@ export function LearnerDashboard() {
     return "Level 1 - New";
   }, [bookings.length, profile?.swimmerProfile?.level]);
 
-  const allocatedTrainingMinutes = Math.min(profile?.swimmerProfile?.sessionTimeLimitMinutes ?? 40, 60);
-  const effectiveWorkoutMinutes = Math.min(requestedWorkoutMinutes, allocatedTrainingMinutes);
+  const manualSwimmerProfile = useMemo<SwimmerProfile | null>(() => {
+    const level = manualLevel;
+    const waterTreadingCapabilitySeconds = Number.parseInt(manualWaterTreadingSeconds, 10);
+    const fearOfDeepWater =
+      manualDeepWaterConfidence === "true" ? true : manualDeepWaterConfidence === "false" ? false : null;
+    const fitnessGoals = manualFitnessGoals
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean);
+    const preferredStrokes = manualPreferredStrokes
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean);
+    const sessionTimeLimitMinutes = Number.parseInt(manualSessionMinutes, 10);
+    const notes = manualNotes.trim();
+
+    if (
+      !level ||
+      !Number.isFinite(waterTreadingCapabilitySeconds) ||
+      fearOfDeepWater === null ||
+      fitnessGoals.length === 0 ||
+      preferredStrokes.length === 0 ||
+      !Number.isFinite(sessionTimeLimitMinutes)
+    ) {
+      return null;
+    }
+
+    return {
+      level,
+      waterTreadingCapabilitySeconds: Math.max(0, waterTreadingCapabilitySeconds),
+      fearOfDeepWater,
+      fitnessGoals,
+      preferredStrokes,
+      sessionTimeLimitMinutes: Math.max(15, Math.min(60, sessionTimeLimitMinutes)),
+      ...(notes ? { notes } : {}),
+    };
+  }, [manualDeepWaterConfidence, manualFitnessGoals, manualLevel, manualNotes, manualPreferredStrokes, manualSessionMinutes, manualWaterTreadingSeconds]);
+
+  const canGenerateWorkout = Boolean(manualSwimmerProfile);
 
   useEffect(() => {
-    setRequestedWorkoutMinutes((current) => Math.min(current, allocatedTrainingMinutes));
-  }, [allocatedTrainingMinutes]);
+    setWorkout(null);
+    setCompletedItems({});
+  }, [manualSwimmerProfile]);
 
   const workoutCompletion = useMemo(() => {
     if (!workout) {
@@ -291,7 +335,10 @@ export function LearnerDashboard() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ requestedMinutes: effectiveWorkoutMinutes }),
+        body: JSON.stringify({
+          requestedMinutes: manualSwimmerProfile?.sessionTimeLimitMinutes ?? 40,
+          swimmerProfile: manualSwimmerProfile,
+        }),
       });
 
       const data = (await response.json()) as {
@@ -384,30 +431,90 @@ export function LearnerDashboard() {
         )}
 
         <div className="mt-4 rounded-xl border border-teal-500/30 bg-black/60 p-4">
-          <p className="text-xs uppercase tracking-[0.18em] text-teal-100/70">Swimmer Profile Context</p>
-          <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-            <div>
-              <p className="text-teal-100/70">Current Level</p>
-              <p className="mt-1 font-semibold text-teal-50">{profile?.swimmerProfile?.level ?? "beginner"}</p>
-            </div>
-            <div>
-              <p className="text-teal-100/70">Water Treading</p>
-              <p className="mt-1 font-semibold text-teal-50">
-                {profile?.swimmerProfile?.waterTreadingCapabilitySeconds ?? 30}s
-              </p>
-            </div>
-            <div>
-              <p className="text-teal-100/70">Deep Water Confidence</p>
-              <p className="mt-1 font-semibold text-teal-50">
-                {profile?.swimmerProfile?.fearOfDeepWater ? "Needs support" : "Confident"}
-              </p>
-            </div>
-            <div>
-              <p className="text-teal-100/70">Daily Time Limit</p>
-              <p className="mt-1 font-semibold text-teal-50">
-                {profile?.swimmerProfile?.sessionTimeLimitMinutes ?? 40} min
-              </p>
-            </div>
+          <p className="text-xs uppercase tracking-[0.18em] text-teal-100/70">Swimmer Intake</p>
+          <p className="mt-2 text-sm text-teal-50/75">
+            Type the details manually before generating the set. The AI will use what you enter here.
+          </p>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <label className="space-y-2 text-sm text-teal-50">
+              <span className="block text-teal-100/70">Swimming Level</span>
+              <select
+                value={manualLevel}
+                onChange={(event) => setManualLevel(event.target.value as SwimLevel | "")}
+                className="w-full rounded-xl border border-teal-500/30 bg-black/70 px-3 py-3 text-teal-50 outline-none transition focus:border-teal-300"
+              >
+                <option value="">Select level</option>
+                <option value="beginner">Beginner</option>
+                <option value="intermediate">Intermediate</option>
+                <option value="advanced">Advanced</option>
+                <option value="competitive">Competitive</option>
+              </select>
+            </label>
+            <label className="space-y-2 text-sm text-teal-50">
+              <span className="block text-teal-100/70">Water Treading Capability (seconds)</span>
+              <input
+                type="number"
+                min={0}
+                placeholder="e.g. 30"
+                value={manualWaterTreadingSeconds}
+                onChange={(event) => setManualWaterTreadingSeconds(event.target.value)}
+                className="w-full rounded-xl border border-teal-500/30 bg-black/70 px-3 py-3 text-teal-50 outline-none transition placeholder:text-teal-100/35 focus:border-teal-300"
+              />
+            </label>
+            <label className="space-y-2 text-sm text-teal-50">
+              <span className="block text-teal-100/70">Deep Water Confidence</span>
+              <select
+                value={manualDeepWaterConfidence}
+                onChange={(event) => setManualDeepWaterConfidence(event.target.value as "" | "true" | "false")}
+                className="w-full rounded-xl border border-teal-500/30 bg-black/70 px-3 py-3 text-teal-50 outline-none transition focus:border-teal-300"
+              >
+                <option value="">Select confidence</option>
+                <option value="false">Confident</option>
+                <option value="true">Needs support</option>
+              </select>
+            </label>
+            <label className="space-y-2 text-sm text-teal-50">
+              <span className="block text-teal-100/70">Session Time Limit (minutes)</span>
+              <input
+                type="number"
+                min={15}
+                max={60}
+                placeholder="e.g. 40"
+                value={manualSessionMinutes}
+                onChange={(event) => setManualSessionMinutes(event.target.value)}
+                className="w-full rounded-xl border border-teal-500/30 bg-black/70 px-3 py-3 text-teal-50 outline-none transition placeholder:text-teal-100/35 focus:border-teal-300"
+              />
+            </label>
+            <label className="space-y-2 text-sm text-teal-50 md:col-span-2">
+              <span className="block text-teal-100/70">Fitness Goals</span>
+              <input
+                type="text"
+                placeholder="e.g. build-water-confidence, improve-freestyle"
+                value={manualFitnessGoals}
+                onChange={(event) => setManualFitnessGoals(event.target.value)}
+                className="w-full rounded-xl border border-teal-500/30 bg-black/70 px-3 py-3 text-teal-50 outline-none transition placeholder:text-teal-100/35 focus:border-teal-300"
+              />
+            </label>
+            <label className="space-y-2 text-sm text-teal-50 md:col-span-2">
+              <span className="block text-teal-100/70">Preferred Strokes</span>
+              <input
+                type="text"
+                placeholder="e.g. freestyle, backstroke"
+                value={manualPreferredStrokes}
+                onChange={(event) => setManualPreferredStrokes(event.target.value)}
+                className="w-full rounded-xl border border-teal-500/30 bg-black/70 px-3 py-3 text-teal-50 outline-none transition placeholder:text-teal-100/35 focus:border-teal-300"
+              />
+            </label>
+            <label className="space-y-2 text-sm text-teal-50 md:col-span-2">
+              <span className="block text-teal-100/70">Coach Notes</span>
+              <textarea
+                rows={3}
+                placeholder="Anything the coach should know before generating the set"
+                value={manualNotes}
+                onChange={(event) => setManualNotes(event.target.value)}
+                className="w-full rounded-xl border border-teal-500/30 bg-black/70 px-3 py-3 text-teal-50 outline-none transition placeholder:text-teal-100/35 focus:border-teal-300"
+              />
+            </label>
           </div>
         </div>
 
@@ -417,46 +524,26 @@ export function LearnerDashboard() {
               <p className="text-xs uppercase tracking-[0.24em] text-teal-300">AI Training Set</p>
               <h2 className="mt-1 text-2xl">Generate Today&apos;s Set</h2>
               <p className="mt-2 max-w-2xl text-sm text-teal-50/75">
-                Your daily set is tailored to your swimmer profile and capped to your allocated coaching time of {allocatedTrainingMinutes} minutes.
+                The generator will only run after you fill the swimmer intake fields above.
               </p>
             </div>
           </div>
-
-          <div className="mt-5 flex flex-wrap items-center gap-3 rounded-2xl border border-teal-500/20 bg-black/30 p-4">
-            <div className="min-w-0 flex-1">
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-teal-500/20 bg-black/30 p-4">
+            <div>
               <p className="text-xs uppercase tracking-[0.22em] text-teal-300">Session Length</p>
-              <p className="mt-1 text-sm text-teal-50/75">Choose how long the generated set should run.</p>
+              <p className="mt-1 text-sm text-teal-50/75">The session length comes from the intake form.</p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {[20, 30, 40, 60].map((minutes) => {
-                const isAllowed = minutes <= allocatedTrainingMinutes;
-                const isSelected = requestedWorkoutMinutes === minutes;
-
-                return (
-                  <button
-                    key={minutes}
-                    type="button"
-                    onClick={() => setRequestedWorkoutMinutes(minutes)}
-                    disabled={!isAllowed || workoutBusy}
-                    className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-                      isSelected
-                        ? "bg-teal-400 text-slate-950"
-                        : "border border-teal-500/30 bg-black/50 text-teal-50 hover:border-teal-400/50"
-                    } ${!isAllowed ? "cursor-not-allowed opacity-40" : ""}`}
-                  >
-                    {minutes} min
-                  </button>
-                );
-              })}
+            <div className="rounded-full border border-teal-500/30 bg-teal-500/10 px-4 py-2 text-sm text-teal-50">
+              {manualSwimmerProfile ? `${manualSwimmerProfile.sessionTimeLimitMinutes} min ready` : "Fill intake fields first"}
             </div>
             <button
               type="button"
               onClick={() => void handleGenerateWorkout()}
-              disabled={workoutBusy}
+              disabled={workoutBusy || !canGenerateWorkout}
               className="inline-flex items-center gap-2 rounded-full bg-teal-400 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-teal-300 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {workoutBusy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              {workoutBusy ? "Generating..." : `Generate ${effectiveWorkoutMinutes} min Set`}
+              {workoutBusy ? "Generating..." : "Generate Set"}
             </button>
           </div>
 
@@ -491,7 +578,7 @@ export function LearnerDashboard() {
               </div>
 
               <div className="rounded-2xl border border-teal-500/20 bg-black/40 p-4 text-sm text-teal-50/80">
-                Estimated duration: <span className="font-semibold text-teal-50">{workout.estimatedMinutes ?? allocatedTrainingMinutes} min</span>
+                Estimated duration: <span className="font-semibold text-teal-50">{workout.estimatedMinutes ?? manualSwimmerProfile?.sessionTimeLimitMinutes ?? 40} min</span>
               </div>
             </div>
           )}
