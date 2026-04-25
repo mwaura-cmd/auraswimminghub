@@ -1,5 +1,18 @@
 export type UserRole = "student" | "parent" | "instructor" | "admin";
 
+export type SwimLevel = "beginner" | "intermediate" | "advanced" | "competitive";
+
+export interface SwimmerProfile {
+  level: SwimLevel;
+  waterTreadingCapabilitySeconds: number;
+  fearOfDeepWater: boolean;
+  fitnessGoals: string[];
+  preferredStrokes: string[];
+  sessionTimeLimitMinutes: number;
+  notes?: string;
+  updatedAt?: string;
+}
+
 export type ProgramType =
   | "Toddlers & Kids"
   | "Teens"
@@ -19,6 +32,7 @@ export interface PlatformUser {
   role: UserRole;
   displayName?: string;
   childrenIds?: string[];
+  swimmerProfile?: SwimmerProfile;
   createdAt?: string;
 }
 

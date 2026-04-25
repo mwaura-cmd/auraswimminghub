@@ -7,8 +7,8 @@ import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { useAuth } from "@/components/providers/auth-provider";
 import { formatSessionDate, formatSessionTime, getSessionDate, isUpcomingBooking } from "@/lib/booking-utils";
 import { BILLING_CYCLES, BILLING_CYCLE_LABEL, formatKes } from "@/lib/pricing";
-import { subscribeBookings } from "@/lib/realtimedb";
-import { AttendanceStatus, Booking } from "@/lib/types";
+import { subscribeBookings, subscribeUserProfile } from "@/lib/realtimedb";
+import { AttendanceStatus, Booking, PlatformUser } from "@/lib/types";
 
 function toAttendanceStatus(status?: AttendanceStatus): AttendanceStatus {
   return status ?? "pending";
@@ -34,7 +34,9 @@ function formatCountdown(milliseconds: number): string {
 export function LearnerDashboard() {
   const { firebaseUser } = useAuth();
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [profile, setProfile] = useState<PlatformUser | null>(null);
   const [bookingError, setBookingError] = useState("");
+  const [profileError, setProfileError] = useState("");
   const [clockTick, setClockTick] = useState(() => Date.now());
 
   useEffect(() => {
@@ -69,6 +71,30 @@ export function LearnerDashboard() {
       window.clearInterval(timer);
     };
   }, []);
+
+  useEffect(() => {
+    const uid = firebaseUser?.uid;
+
+    if (!uid) {
+      setProfile(null);
+      return;
+    }
+
+    const unsubscribe = subscribeUserProfile(
+      uid,
+      (loadedProfile) => {
+        setProfileError("");
+        setProfile(loadedProfile);
+      },
+      (error) => {
+        setProfileError(error.message);
+      },
+    );
+
+    return () => {
+      unsubscribe();
+    };
+  }, [firebaseUser?.uid]);
 
   const nextSession = useMemo(() => {
     const now = new Date(clockTick);
@@ -196,6 +222,11 @@ export function LearnerDashboard() {
   }, [attendanceRate, attendedSessionsCount, bookings.length, currentAttendanceStreak, markedSessionsCount, pendingPayments]);
 
   const learnerLevel = useMemo(() => {
+    const profileLevel = profile?.swimmerProfile?.level;
+    if (profileLevel) {
+      return profileLevel.charAt(0).toUpperCase() + profileLevel.slice(1);
+    }
+
     if (bookings.length >= 8) {
       return "Level 4 - Advanced";
     }
@@ -206,7 +237,7 @@ export function LearnerDashboard() {
       return "Level 2 - Active";
     }
     return "Level 1 - New";
-  }, [bookings.length]);
+  }, [bookings.length, profile?.swimmerProfile?.level]);
 
   return (
     <div className="section-shell grid gap-4 pb-20 lg:grid-cols-3">
@@ -219,6 +250,38 @@ export function LearnerDashboard() {
         {bookingError && (
           <p className="mt-4 rounded-xl border border-rose-500/40 bg-rose-900/20 p-3 text-sm text-rose-200">{bookingError}</p>
         )}
+
+        {profileError && (
+          <p className="mt-4 rounded-xl border border-rose-500/40 bg-rose-900/20 p-3 text-sm text-rose-200">{profileError}</p>
+        )}
+
+        <div className="mt-4 rounded-xl border border-teal-500/30 bg-black/60 p-4">
+          <p className="text-xs uppercase tracking-[0.18em] text-teal-100/70">Swimmer Profile Context</p>
+          <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <p className="text-teal-100/70">Current Level</p>
+              <p className="mt-1 font-semibold text-teal-50">{profile?.swimmerProfile?.level ?? "beginner"}</p>
+            </div>
+            <div>
+              <p className="text-teal-100/70">Water Treading</p>
+              <p className="mt-1 font-semibold text-teal-50">
+                {profile?.swimmerProfile?.waterTreadingCapabilitySeconds ?? 30}s
+              </p>
+            </div>
+            <div>
+              <p className="text-teal-100/70">Deep Water Confidence</p>
+              <p className="mt-1 font-semibold text-teal-50">
+                {profile?.swimmerProfile?.fearOfDeepWater ? "Needs support" : "Confident"}
+              </p>
+            </div>
+            <div>
+              <p className="text-teal-100/70">Daily Time Limit</p>
+              <p className="mt-1 font-semibold text-teal-50">
+                {profile?.swimmerProfile?.sessionTimeLimitMinutes ?? 40} min
+              </p>
+            </div>
+          </div>
+        </div>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-xl border border-teal-500/30 bg-black/60 p-3">

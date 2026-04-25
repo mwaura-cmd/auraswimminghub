@@ -1,7 +1,19 @@
 import { equalTo, get, onValue, orderByChild, push, query, ref, set, update } from "firebase/database";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, rtdb, isFirebaseConfigured } from "@/lib/firebase";
-import { AttendanceStatus, Booking, BookingInput, GalleryItem, GalleryMediaType, PlatformUser, UserRole } from "@/lib/types";
+import { AttendanceStatus, Booking, BookingInput, GalleryItem, GalleryMediaType, PlatformUser, SwimmerProfile, UserRole } from "@/lib/types";
+
+function buildDefaultSwimmerProfile(): SwimmerProfile {
+  return {
+    level: "beginner",
+    waterTreadingCapabilitySeconds: 30,
+    fearOfDeepWater: true,
+    fitnessGoals: ["build-water-confidence"],
+    preferredStrokes: ["freestyle"],
+    sessionTimeLimitMinutes: 40,
+    updatedAt: new Date().toISOString(),
+  };
+}
 
 export async function ensureUserProfile(role: UserRole, payload?: Partial<PlatformUser>) {
   if (!isFirebaseConfigured || !auth || !rtdb) {
@@ -14,13 +26,27 @@ export async function ensureUserProfile(role: UserRole, payload?: Partial<Platfo
   }
 
   const userRef = ref(rtdb, `users/${currentUser.uid}`);
+  const existingSnapshot = await get(userRef);
+  const existingProfile = existingSnapshot.exists() ? (existingSnapshot.val() as PlatformUser) : null;
+
+  const swimmerProfile = payload?.swimmerProfile
+    ? {
+        ...buildDefaultSwimmerProfile(),
+        ...(existingProfile?.swimmerProfile ?? {}),
+        ...payload.swimmerProfile,
+        updatedAt: new Date().toISOString(),
+      }
+    : (existingProfile?.swimmerProfile ?? buildDefaultSwimmerProfile());
+
   await set(userRef, {
+    ...(existingProfile ?? {}),
     uid: currentUser.uid,
     email: currentUser.email,
     role,
     displayName: payload?.displayName ?? currentUser.displayName ?? "",
     childrenIds: payload?.childrenIds ?? [],
-    createdAt: new Date().toISOString(),
+    swimmerProfile,
+    createdAt: existingProfile?.createdAt ?? new Date().toISOString(),
   });
 }
 
@@ -55,6 +81,33 @@ export async function findUserProfileByEmail(email: string): Promise<PlatformUse
 
   const profiles = Object.values(snapshot.val()) as PlatformUser[];
   return profiles[0] ?? null;
+}
+
+export function subscribeUserProfile(
+  uid: string,
+  onProfile: (profile: PlatformUser | null) => void,
+  onError?: (error: Error) => void,
+) {
+  if (!isFirebaseConfigured || !rtdb || !uid) {
+    onProfile(null);
+    return () => undefined;
+  }
+
+  const userRef = ref(rtdb, `users/${uid}`);
+  return onValue(
+    userRef,
+    (snapshot) => {
+      if (!snapshot.exists()) {
+        onProfile(null);
+        return;
+      }
+
+      onProfile(snapshot.val() as PlatformUser);
+    },
+    (error) => {
+      onError?.(error instanceof Error ? error : new Error("Failed to load user profile"));
+    },
+  );
 }
 
 export async function createBooking(data: BookingInput) {
