@@ -1,6 +1,7 @@
 import "server-only";
 
 import { cert, getApps, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 import { getDatabase } from "firebase-admin/database";
 
 function getAdminApp() {
@@ -30,4 +31,13 @@ export function getAdminRtdb() {
   }
 
   return getDatabase(app);
+}
+
+export function getAdminAuth() {
+  const app = getAdminApp();
+  if (!app) {
+    return null;
+  }
+
+  return getAuth(app);
 }
