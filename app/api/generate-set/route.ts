@@ -341,25 +341,39 @@ export async function POST(request: NextRequest) {
     const requestedMinutes = clampTrainingMinutes(body.requestedMinutes);
     const manualProfile = normalizeSwimmerProfile(body.swimmerProfile);
 
-    const profileSnapshot = await adminRtdb.ref(`users/${uid}`).get();
-    const profile = profileSnapshot.exists() ? (profileSnapshot.val() as PlatformUser) : null;
+    const resolvedSwimmerProfile = manualProfile ?? null;
+    const history = summarizeBookingHistory([]);
 
-    const resolvedSwimmerProfile = manualProfile ?? profile?.swimmerProfile ?? null;
+    if (!manualProfile) {
+      const profileSnapshot = await adminRtdb.ref(`users/${uid}`).get();
+      const profile = profileSnapshot.exists() ? (profileSnapshot.val() as PlatformUser) : null;
 
-    const bookingsSnapshot = await adminRtdb.ref("bookings").get();
-    const bookingData = bookingsSnapshot.exists()
-      ? (bookingsSnapshot.val() as Record<string, Omit<Booking, "id">>)
-      : {};
+      const bookingsSnapshot = await adminRtdb.ref("bookings").get();
+      const bookingData = bookingsSnapshot.exists()
+        ? (bookingsSnapshot.val() as Record<string, Omit<Booking, "id">>)
+        : {};
 
-    const bookings = Object.entries(bookingData)
-      .map(([id, item]) => ({ id, ...item }))
-      .filter((item) => {
-        const uidMatch = item.userId === uid;
-        const emailMatch = Boolean(email) && item.email?.trim().toLowerCase() === email;
-        return uidMatch || emailMatch;
+      const bookings = Object.entries(bookingData)
+        .map(([id, item]) => ({ id, ...item }))
+        .filter((item) => {
+          const uidMatch = item.userId === uid;
+          const emailMatch = Boolean(email) && item.email?.trim().toLowerCase() === email;
+          return uidMatch || emailMatch;
+        });
+
+      const liveHistory = summarizeBookingHistory(bookings);
+      const workout = await fetchWorkoutFromLlm({
+        requestedMinutes,
+        swimmerProfile: profile?.swimmerProfile ?? null,
+        history: liveHistory,
       });
 
-    const history = summarizeBookingHistory(bookings);
+      return NextResponse.json({
+        requestedMinutes,
+        cappedAtMinutes: 60,
+        workout,
+      });
+    }
 
     const workout = await fetchWorkoutFromLlm({
       requestedMinutes,
