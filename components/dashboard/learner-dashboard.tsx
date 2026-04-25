@@ -37,6 +37,7 @@ export function LearnerDashboard() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [profile, setProfile] = useState<PlatformUser | null>(null);
   const [workout, setWorkout] = useState<GeneratedWorkout | null>(null);
+  const [requestedWorkoutMinutes, setRequestedWorkoutMinutes] = useState(40);
   const [workoutBusy, setWorkoutBusy] = useState(false);
   const [workoutError, setWorkoutError] = useState("");
   const [completedItems, setCompletedItems] = useState<Record<string, boolean>>({});
@@ -245,6 +246,11 @@ export function LearnerDashboard() {
   }, [bookings.length, profile?.swimmerProfile?.level]);
 
   const allocatedTrainingMinutes = Math.min(profile?.swimmerProfile?.sessionTimeLimitMinutes ?? 40, 60);
+  const effectiveWorkoutMinutes = Math.min(requestedWorkoutMinutes, allocatedTrainingMinutes);
+
+  useEffect(() => {
+    setRequestedWorkoutMinutes((current) => Math.min(current, allocatedTrainingMinutes));
+  }, [allocatedTrainingMinutes]);
 
   const workoutCompletion = useMemo(() => {
     if (!workout) {
@@ -285,7 +291,7 @@ export function LearnerDashboard() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ requestedMinutes: allocatedTrainingMinutes }),
+        body: JSON.stringify({ requestedMinutes: effectiveWorkoutMinutes }),
       });
 
       const data = (await response.json()) as {
@@ -414,6 +420,35 @@ export function LearnerDashboard() {
                 Your daily set is tailored to your swimmer profile and capped to your allocated coaching time of {allocatedTrainingMinutes} minutes.
               </p>
             </div>
+          </div>
+
+          <div className="mt-5 flex flex-wrap items-center gap-3 rounded-2xl border border-teal-500/20 bg-black/30 p-4">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs uppercase tracking-[0.22em] text-teal-300">Session Length</p>
+              <p className="mt-1 text-sm text-teal-50/75">Choose how long the generated set should run.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {[20, 30, 40, 60].map((minutes) => {
+                const isAllowed = minutes <= allocatedTrainingMinutes;
+                const isSelected = requestedWorkoutMinutes === minutes;
+
+                return (
+                  <button
+                    key={minutes}
+                    type="button"
+                    onClick={() => setRequestedWorkoutMinutes(minutes)}
+                    disabled={!isAllowed || workoutBusy}
+                    className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                      isSelected
+                        ? "bg-teal-400 text-slate-950"
+                        : "border border-teal-500/30 bg-black/50 text-teal-50 hover:border-teal-400/50"
+                    } ${!isAllowed ? "cursor-not-allowed opacity-40" : ""}`}
+                  >
+                    {minutes} min
+                  </button>
+                );
+              })}
+            </div>
             <button
               type="button"
               onClick={() => void handleGenerateWorkout()}
@@ -421,7 +456,7 @@ export function LearnerDashboard() {
               className="inline-flex items-center gap-2 rounded-full bg-teal-400 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-teal-300 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {workoutBusy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              {workoutBusy ? "Generating..." : "Generate Today's Set"}
+              {workoutBusy ? "Generating..." : `Generate ${effectiveWorkoutMinutes} min Set`}
             </button>
           </div>
 
