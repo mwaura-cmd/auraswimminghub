@@ -404,9 +404,26 @@ export async function POST(request: NextRequest) {
     const body = (await request.json().catch(() => ({}))) as GenerateSetRequest;
     const requestedMinutes = clampTrainingMinutes(body.requestedMinutes);
     const manualProfile = normalizeSwimmerProfile(body.swimmerProfile);
+    const openAiKey = process.env.OPENAI_API_KEY?.trim() ?? "";
 
     const resolvedSwimmerProfile = manualProfile ?? null;
     const history = summarizeBookingHistory([]);
+
+    if (!openAiKey) {
+      const fallbackWorkout = buildFallbackWorkout({
+        requestedMinutes,
+        swimmerProfile: resolvedSwimmerProfile,
+        history,
+      });
+
+      return NextResponse.json({
+        requestedMinutes,
+        cappedAtMinutes: 60,
+        workout: fallbackWorkout,
+        source: "fallback",
+        warning: "OPENAI_API_KEY missing; generated a fallback set instead.",
+      });
+    }
 
     if (!manualProfile) {
       const profileSnapshot = await adminRtdb.ref(`users/${uid}`).get();
