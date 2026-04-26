@@ -205,6 +205,70 @@ function normalizeWorkout(workout: Record<string, unknown>, requestedMinutes: nu
   } satisfies GeneratedWorkout;
 }
 
+function buildFallbackWorkout(input: {
+  requestedMinutes: number;
+  swimmerProfile: SwimmerProfile | null;
+  history: ReturnType<typeof summarizeBookingHistory>;
+}): GeneratedWorkout {
+  const level = input.swimmerProfile?.level ?? "beginner";
+  const primaryStroke = input.swimmerProfile?.preferredStrokes?.[0] ?? "freestyle";
+  const firstGoal = input.swimmerProfile?.fitnessGoals?.[0] ?? "build-water-confidence";
+  const fearOfDeepWater = Boolean(input.swimmerProfile?.fearOfDeepWater);
+  const treadingSeconds = input.swimmerProfile?.waterTreadingCapabilitySeconds ?? 30;
+
+  const warmUp = [
+    { description: `Easy ${primaryStroke} swim`, distance: "50", reps: 2 },
+    { description: "Kick with board", distance: "25", reps: 4 },
+  ];
+
+  const mainSet =
+    level === "competitive"
+      ? [
+          { description: `${primaryStroke} pace intervals`, distance: "100", reps: 4 },
+          { description: "IM transition drill", distance: "50", reps: 4 },
+        ]
+      : level === "advanced"
+        ? [
+            { description: `${primaryStroke} endurance reps`, distance: "75", reps: 4 },
+            { description: "Technique + breathing drill", distance: "50", reps: 4 },
+          ]
+        : level === "intermediate"
+          ? [
+              { description: `${primaryStroke} form sets`, distance: "50", reps: 4 },
+              { description: "Pull buoy control drill", distance: "25", reps: 6 },
+            ]
+          : [
+              { description: `${primaryStroke} confidence laps`, distance: "25", reps: 6 },
+              { description: "Float-to-glide drill", distance: "25", reps: 4 },
+            ];
+
+  const treadingMinutes = fearOfDeepWater ? 8 : 5;
+  const treadingDrills = [
+    {
+      description: fearOfDeepWater
+        ? `Supported deep-water treading (${treadingSeconds}s baseline)`
+        : `Progressive treading hold (${treadingSeconds}s baseline)`,
+      duration: `${treadingMinutes}`,
+    },
+  ];
+
+  const coolDown = [
+    { description: "Backstroke recovery", distance: "25", reps: 2 },
+    { description: "Easy mixed stroke", distance: "25", reps: 2 },
+  ];
+
+  return {
+    workout_title: "Aura Smart Fallback Set",
+    focus: `${firstGoal.replace(/-/g, " ")} with ${primaryStroke} emphasis`,
+    warm_up: warmUp,
+    main_set: mainSet,
+    treading_drills: treadingDrills,
+    cool_down: coolDown,
+    requestedMinutes: input.requestedMinutes,
+    estimatedMinutes: input.requestedMinutes,
+  };
+}
+
 function summarizeBookingHistory(bookings: Booking[]) {
   const totalSessions = bookings.length;
   const attended = bookings.filter((item) => item.attendanceStatus === "present").length;
@@ -362,29 +426,61 @@ export async function POST(request: NextRequest) {
         });
 
       const liveHistory = summarizeBookingHistory(bookings);
-      const workout = await fetchWorkoutFromLlm({
-        requestedMinutes,
-        swimmerProfile: profile?.swimmerProfile ?? null,
-        history: liveHistory,
-      });
+      let workout: GeneratedWorkout;
+      let generationSource: "ai" | "fallback" = "ai";
+      let generationWarning: string | undefined;
+
+      try {
+        workout = await fetchWorkoutFromLlm({
+          requestedMinutes,
+          swimmerProfile: profile?.swimmerProfile ?? null,
+          history: liveHistory,
+        });
+      } catch (generationError) {
+        generationSource = "fallback";
+        generationWarning = generationError instanceof Error ? generationError.message : "AI generation unavailable";
+        workout = buildFallbackWorkout({
+          requestedMinutes,
+          swimmerProfile: profile?.swimmerProfile ?? null,
+          history: liveHistory,
+        });
+      }
 
       return NextResponse.json({
         requestedMinutes,
         cappedAtMinutes: 60,
         workout,
+        source: generationSource,
+        warning: generationWarning,
       });
     }
 
-    const workout = await fetchWorkoutFromLlm({
-      requestedMinutes,
-      swimmerProfile: resolvedSwimmerProfile,
-      history,
-    });
+    let workout: GeneratedWorkout;
+    let generationSource: "ai" | "fallback" = "ai";
+    let generationWarning: string | undefined;
+
+    try {
+      workout = await fetchWorkoutFromLlm({
+        requestedMinutes,
+        swimmerProfile: resolvedSwimmerProfile,
+        history,
+      });
+    } catch (generationError) {
+      generationSource = "fallback";
+      generationWarning = generationError instanceof Error ? generationError.message : "AI generation unavailable";
+      workout = buildFallbackWorkout({
+        requestedMinutes,
+        swimmerProfile: resolvedSwimmerProfile,
+        history,
+      });
+    }
 
     return NextResponse.json({
       requestedMinutes,
       cappedAtMinutes: 60,
       workout,
+      source: generationSource,
+      warning: generationWarning,
     });
   } catch (error) {
     return NextResponse.json(

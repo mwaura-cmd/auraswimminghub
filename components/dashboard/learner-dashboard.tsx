@@ -46,6 +46,7 @@ export function LearnerDashboard() {
   const [manualNotes, setManualNotes] = useState("");
   const [workoutBusy, setWorkoutBusy] = useState(false);
   const [workoutError, setWorkoutError] = useState("");
+  const [workoutInfo, setWorkoutInfo] = useState("");
   const [completedItems, setCompletedItems] = useState<Record<string, boolean>>({});
   const [bookingError, setBookingError] = useState("");
   const [profileError, setProfileError] = useState("");
@@ -319,6 +320,7 @@ export function LearnerDashboard() {
   const handleGenerateWorkout = async () => {
     setWorkoutBusy(true);
     setWorkoutError("");
+    setWorkoutInfo("");
     let timeoutHandle: number | undefined;
 
     try {
@@ -351,6 +353,8 @@ export function LearnerDashboard() {
       const data = (await response.json()) as {
         workout?: GeneratedWorkout;
         error?: string;
+        source?: "ai" | "fallback";
+        warning?: string;
       };
 
       if (!response.ok) {
@@ -359,6 +363,10 @@ export function LearnerDashboard() {
 
       setWorkout(data.workout ?? null);
       setCompletedItems({});
+
+      if (data.source === "fallback") {
+        setWorkoutInfo(data.warning ?? "AI response was delayed, so a smart fallback set was generated.");
+      }
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
         setWorkoutError("Generation took too long. Please try again.");
@@ -563,6 +571,10 @@ export function LearnerDashboard() {
 
           {workoutError && (
             <p className="mt-4 rounded-xl border border-rose-500/40 bg-rose-900/20 p-3 text-sm text-rose-200">{workoutError}</p>
+          )}
+
+          {workoutInfo && (
+            <p className="mt-4 rounded-xl border border-amber-500/40 bg-amber-900/20 p-3 text-sm text-amber-100">{workoutInfo}</p>
           )}
 
           {workout && (
