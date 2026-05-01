@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getAdminAuth, getAdminRtdb } from "@/lib/firebase-admin";
 import { Booking, PlatformUser, SwimmerProfile } from "@/lib/types";
 
