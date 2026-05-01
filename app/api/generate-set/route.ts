@@ -29,7 +29,6 @@ const WORKOUT_JSON_SCHEMA = {
   name: "ai_swimming_set",
   schema: {
     type: "object",
-    additionalProperties: false,
     required: ["workout_title", "focus", "warm_up", "main_set", "treading_drills", "cool_down"],
     properties: {
       workout_title: { type: "string" },
@@ -38,7 +37,6 @@ const WORKOUT_JSON_SCHEMA = {
         type: "array",
         items: {
           type: "object",
-          additionalProperties: false,
           required: ["description", "distance", "reps"],
           properties: {
             description: { type: "string" },
@@ -51,7 +49,6 @@ const WORKOUT_JSON_SCHEMA = {
         type: "array",
         items: {
           type: "object",
-          additionalProperties: false,
           required: ["description", "distance", "reps"],
           properties: {
             description: { type: "string" },
@@ -64,7 +61,6 @@ const WORKOUT_JSON_SCHEMA = {
         type: "array",
         items: {
           type: "object",
-          additionalProperties: false,
           required: ["description", "duration"],
           properties: {
             description: { type: "string" },
@@ -76,7 +72,6 @@ const WORKOUT_JSON_SCHEMA = {
         type: "array",
         items: {
           type: "object",
-          additionalProperties: false,
           required: ["description", "distance", "reps"],
           properties: {
             description: { type: "string" },
@@ -233,12 +228,12 @@ async function fetchWorkoutFromLlm(input: {
   swimmerProfile: SwimmerProfile | null;
   history: ReturnType<typeof summarizeBookingHistory>;
 }): Promise<GeneratedWorkout> {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    throw new Error("OPENAI_API_KEY missing");
+    throw new Error("GEMINI_API_KEY missing");
   }
 
-  const model = process.env.OPENAI_MODEL?.trim() || "gpt-4.1-mini";
+  const model = process.env.OPENAI_MODEL?.trim() || "gemini-1.5-flash";
 
   const controller = new AbortController();
   const timeoutHandle = setTimeout(() => {
@@ -246,52 +241,46 @@ async function fetchWorkoutFromLlm(input: {
   }, OPENAI_TIMEOUT_MS);
 
   try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
       },
       signal: controller.signal,
       body: JSON.stringify({
-        model,
-        temperature: 0.4,
-        max_completion_tokens: 1200,
-        response_format: {
-          type: "json_schema",
-          json_schema: {
-            name: WORKOUT_JSON_SCHEMA.name,
-            strict: true,
-            schema: WORKOUT_JSON_SCHEMA.schema,
-          },
+        systemInstruction: {
+          parts: [{ text: COACH_SYSTEM_PROMPT }]
         },
-        messages: [
-          {
-            role: "system",
-            content: COACH_SYSTEM_PROMPT,
-          },
+        contents: [
           {
             role: "user",
-            content: JSON.stringify({
-              requested_minutes: input.requestedMinutes,
-              swimmer_profile: input.swimmerProfile ?? null,
-              booking_history: input.history,
-            }),
+            parts: [
+              {
+                text: JSON.stringify({
+                  requested_minutes: input.requestedMinutes,
+                  swimmer_profile: input.swimmerProfile ?? null,
+                  booking_history: input.history,
+                }),
+              }
+            ],
           },
         ],
+        generationConfig: {
+          temperature: 0.4,
+          maxOutputTokens: 1200,
+          responseMimeType: "application/json",
+          responseSchema: WORKOUT_JSON_SCHEMA.schema,
+        }
       }),
     });
 
-    const payload = (await response.json()) as {
-      choices?: Array<{ message?: { content?: string | null } }>;
-      error?: { message?: string };
-    };
+    const payload = await response.json();
 
     if (!response.ok) {
       throw new Error(payload.error?.message ?? "LLM request failed");
     }
 
-    const content = payload.choices?.[0]?.message?.content;
+    const content = payload.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!content) {
       throw new Error("LLM returned empty content");
     }
@@ -337,18 +326,20 @@ export async function POST(request: NextRequest) {
     const uid = decoded.uid;
     const email = decoded.email?.trim().toLowerCase() ?? "";
 
+
+
     const body = (await request.json().catch(() => ({}))) as GenerateSetRequest;
     const requestedMinutes = clampTrainingMinutes(body.requestedMinutes);
     const manualProfile = normalizeSwimmerProfile(body.swimmerProfile);
-    const openAiKey = process.env.OPENAI_API_KEY?.trim() ?? "";
+    const geminiKey = process.env.GEMINI_API_KEY?.trim() ?? process.env.OPENAI_API_KEY?.trim() ?? "";
 
     const resolvedSwimmerProfile = manualProfile ?? null;
     const history = summarizeBookingHistory([]);
 
-    if (!openAiKey) {
+    if (!geminiKey) {
       return NextResponse.json(
         {
-          error: "OPENAI_API_KEY missing",
+          error: "GEMINI_API_KEY missing",
         },
         { status: 500 },
       );
