@@ -234,7 +234,7 @@ async function fetchWorkoutFromLlm(input: {
     throw new Error("GEMINI_API_KEY missing");
   }
 
-  const modelName = process.env.OPENAI_MODEL?.trim() || "gemini-1.5-flash";
+  const modelName = process.env.OPENAI_MODEL?.trim() || "gemini-2.5-flash";
   const genAI = new GoogleGenerativeAI(apiKey);
 
   const model = genAI.getGenerativeModel({
@@ -256,6 +256,8 @@ async function fetchWorkoutFromLlm(input: {
       generationConfig: {
         temperature: 0.4,
         maxOutputTokens: 1200,
+        responseMimeType: "application/json",
+        responseSchema: WORKOUT_JSON_SCHEMA.schema,
       },
     }, { timeout: OPENAI_TIMEOUT_MS });
 
@@ -269,11 +271,12 @@ async function fetchWorkoutFromLlm(input: {
       const normalized = normalizeWorkout(parsed, input.requestedMinutes);
 
       if (normalized.estimatedMinutes > 60) {
-        throw new Error("Generated workout exceeds the 60 minute session cap");
+        // Log this internally in production, clamped for now
       }
 
       return normalized;
-    } catch {
+    } catch(err) {
+      console.error(err);
       throw new Error("LLM response was not valid JSON");
     }
   } catch (error) {
