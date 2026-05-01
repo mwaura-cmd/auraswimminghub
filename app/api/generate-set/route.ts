@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import { getAdminAuth, getAdminRtdb } from "@/lib/firebase-admin";
 import { Booking, PlatformUser, SwimmerProfile } from "@/lib/types";
 
@@ -233,54 +234,32 @@ async function fetchWorkoutFromLlm(input: {
     throw new Error("GEMINI_API_KEY missing");
   }
 
-  const model = process.env.OPENAI_MODEL?.trim() || "gemini-1.5-flash";
+  const modelName = process.env.OPENAI_MODEL?.trim() || "gemini-1.5-flash";
+  const genAI = new GoogleGenerativeAI(apiKey);
 
-  const controller = new AbortController();
-  const timeoutHandle = setTimeout(() => {
-    controller.abort();
-  }, OPENAI_TIMEOUT_MS);
+  const model = genAI.getGenerativeModel({
+    model: modelName,
+  });
 
   try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
+    const result = await model.generateContent({
+      contents: [{
+        role: "user",
+        parts: [{
+          text: COACH_SYSTEM_PROMPT + "\n\n" + JSON.stringify({
+            requested_minutes: input.requestedMinutes,
+            swimmer_profile: input.swimmerProfile ?? null,
+            booking_history: input.history,
+          })
+        }]
+      }],
+      generationConfig: {
+        temperature: 0.4,
+        maxOutputTokens: 1200,
       },
-      signal: controller.signal,
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: COACH_SYSTEM_PROMPT }]
-        },
-        contents: [
-          {
-            role: "user",
-            parts: [
-              {
-                text: JSON.stringify({
-                  requested_minutes: input.requestedMinutes,
-                  swimmer_profile: input.swimmerProfile ?? null,
-                  booking_history: input.history,
-                }),
-              }
-            ],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.4,
-          maxOutputTokens: 1200,
-          responseMimeType: "application/json",
-          responseSchema: WORKOUT_JSON_SCHEMA.schema,
-        }
-      }),
-    });
+    }, { timeout: OPENAI_TIMEOUT_MS });
 
-    const payload = await response.json();
-
-    if (!response.ok) {
-      throw new Error(payload.error?.message ?? "LLM request failed");
-    }
-
-    const content = payload.candidates?.[0]?.content?.parts?.[0]?.text;
+    const content = result.response.text();
     if (!content) {
       throw new Error("LLM returned empty content");
     }
@@ -298,13 +277,10 @@ async function fetchWorkoutFromLlm(input: {
       throw new Error("LLM response was not valid JSON");
     }
   } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
+    if (error instanceof Error && (error.name === "AbortError" || error.message.includes("timeout"))) {
       throw new Error("AI generation timed out. Please try again.");
     }
-
     throw error;
-  } finally {
-    clearTimeout(timeoutHandle);
   }
 }
 
