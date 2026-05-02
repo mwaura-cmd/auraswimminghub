@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI, SchemaType, Schema } from "@google/generative-ai";
 import { getAdminAuth, getAdminRtdb } from "@/lib/firebase-admin";
 import { Booking, PlatformUser, SwimmerProfile } from "@/lib/types";
 
@@ -29,61 +29,61 @@ type GeneratedWorkout = {
 const WORKOUT_JSON_SCHEMA = {
   name: "ai_swimming_set",
   schema: {
-    type: "object",
+    type: SchemaType.OBJECT,
     required: ["workout_title", "focus", "warm_up", "main_set", "treading_drills", "cool_down"],
     properties: {
-      workout_title: { type: "string" },
-      focus: { type: "string" },
+      workout_title: { type: SchemaType.STRING },
+      focus: { type: SchemaType.STRING },
       warm_up: {
-        type: "array",
+        type: SchemaType.ARRAY,
         items: {
-          type: "object",
+          type: SchemaType.OBJECT,
           required: ["description", "distance", "reps"],
           properties: {
-            description: { type: "string" },
-            distance: { type: "string" },
-            reps: { type: "number" },
+            description: { type: SchemaType.STRING },
+            distance: { type: SchemaType.STRING },
+            reps: { type: SchemaType.NUMBER },
           },
         },
       },
       main_set: {
-        type: "array",
+        type: SchemaType.ARRAY,
         items: {
-          type: "object",
+          type: SchemaType.OBJECT,
           required: ["description", "distance", "reps"],
           properties: {
-            description: { type: "string" },
-            distance: { type: "string" },
-            reps: { type: "number" },
+            description: { type: SchemaType.STRING },
+            distance: { type: SchemaType.STRING },
+            reps: { type: SchemaType.NUMBER },
           },
         },
       },
       treading_drills: {
-        type: "array",
+        type: SchemaType.ARRAY,
         items: {
-          type: "object",
+          type: SchemaType.OBJECT,
           required: ["description", "duration"],
           properties: {
-            description: { type: "string" },
-            duration: { type: "string" },
+            description: { type: SchemaType.STRING },
+            duration: { type: SchemaType.STRING },
           },
         },
       },
       cool_down: {
-        type: "array",
+        type: SchemaType.ARRAY,
         items: {
-          type: "object",
+          type: SchemaType.OBJECT,
           required: ["description", "distance", "reps"],
           properties: {
-            description: { type: "string" },
-            distance: { type: "string" },
-            reps: { type: "number" },
+            description: { type: SchemaType.STRING },
+            distance: { type: SchemaType.STRING },
+            reps: { type: SchemaType.NUMBER },
           },
         },
       },
     },
   },
-} as const;
+};
 
 const COACH_SYSTEM_PROMPT = [
   "You are an elite, supportive swimming coach for Aura Swimming Hub.",
@@ -257,7 +257,7 @@ async function fetchWorkoutFromLlm(input: {
         temperature: 0.4,
         maxOutputTokens: 1200,
         responseMimeType: "application/json",
-        responseSchema: WORKOUT_JSON_SCHEMA.schema,
+        responseSchema: WORKOUT_JSON_SCHEMA.schema as Schema,
       },
     }, { timeout: OPENAI_TIMEOUT_MS });
 
