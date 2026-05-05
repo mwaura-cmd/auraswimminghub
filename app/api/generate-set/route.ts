@@ -97,6 +97,21 @@ const COACH_SYSTEM_PROMPT = [
 
 const OPENAI_TIMEOUT_MS = 25000;
 
+function extractJsonPayload(text: string): string {
+  const stripped = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+  if (stripped.startsWith("{") && stripped.endsWith("}")) {
+    return stripped;
+  }
+
+  const firstBrace = stripped.indexOf("{");
+  const lastBrace = stripped.lastIndexOf("}");
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    return stripped.slice(firstBrace, lastBrace + 1);
+  }
+
+  return stripped;
+}
+
 function parseBearerToken(request: NextRequest): string | null {
   const header = request.headers.get("authorization") ?? request.headers.get("Authorization");
   if (!header || !header.toLowerCase().startsWith("bearer ")) {
@@ -267,7 +282,8 @@ async function fetchWorkoutFromLlm(input: {
     }
 
     try {
-      const parsed = JSON.parse(content) as Record<string, unknown>;
+      const jsonPayload = extractJsonPayload(content);
+      const parsed = JSON.parse(jsonPayload) as Record<string, unknown>;
       const normalized = normalizeWorkout(parsed, input.requestedMinutes);
 
       if (normalized.estimatedMinutes > 60) {
