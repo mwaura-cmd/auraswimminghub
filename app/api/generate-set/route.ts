@@ -196,14 +196,16 @@ function trimWorkoutToMinutes(
     cool_down: [...workout.cool_down],
   };
 
-  const minKeep = {
+  type SectionKey = keyof typeof sections;
+
+  const minKeep: Record<SectionKey, number> = {
     warm_up: sections.warm_up.length > 0 ? 1 : 0,
     main_set: sections.main_set.length > 0 ? 1 : 0,
     treading_drills: preferKeepTreading && sections.treading_drills.length > 0 ? 1 : 0,
     cool_down: sections.cool_down.length > 0 ? 1 : 0,
   };
 
-  const trimOrder = preferKeepTreading
+  const trimOrder: SectionKey[] = preferKeepTreading
     ? ["main_set", "warm_up", "cool_down", "treading_drills"]
     : ["main_set", "treading_drills", "warm_up", "cool_down"];
 
