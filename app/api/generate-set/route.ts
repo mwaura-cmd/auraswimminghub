@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI, SchemaType, Schema } from "@google/generative-ai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getAdminAuth, getAdminRtdb } from "@/lib/firebase-admin";
 import { Booking, PlatformUser, SwimmerProfile } from "@/lib/types";
 
@@ -26,73 +26,19 @@ type GeneratedWorkout = {
   estimatedMinutes: number;
 };
 
-const WORKOUT_JSON_SCHEMA = {
-  name: "ai_swimming_set",
-  schema: {
-    type: SchemaType.OBJECT,
-    required: ["workout_title", "focus", "warm_up", "main_set", "treading_drills", "cool_down"],
-    properties: {
-      workout_title: { type: SchemaType.STRING },
-      focus: { type: SchemaType.STRING },
-      warm_up: {
-        type: SchemaType.ARRAY,
-        items: {
-          type: SchemaType.OBJECT,
-          required: ["description", "distance", "reps"],
-          properties: {
-            description: { type: SchemaType.STRING },
-            distance: { type: SchemaType.STRING },
-            reps: { type: SchemaType.NUMBER },
-          },
-        },
-      },
-      main_set: {
-        type: SchemaType.ARRAY,
-        items: {
-          type: SchemaType.OBJECT,
-          required: ["description", "distance", "reps"],
-          properties: {
-            description: { type: SchemaType.STRING },
-            distance: { type: SchemaType.STRING },
-            reps: { type: SchemaType.NUMBER },
-          },
-        },
-      },
-      treading_drills: {
-        type: SchemaType.ARRAY,
-        items: {
-          type: SchemaType.OBJECT,
-          required: ["description", "duration"],
-          properties: {
-            description: { type: SchemaType.STRING },
-            duration: { type: SchemaType.STRING },
-          },
-        },
-      },
-      cool_down: {
-        type: SchemaType.ARRAY,
-        items: {
-          type: SchemaType.OBJECT,
-          required: ["description", "distance", "reps"],
-          properties: {
-            description: { type: SchemaType.STRING },
-            distance: { type: SchemaType.STRING },
-            reps: { type: SchemaType.NUMBER },
-          },
-        },
-      },
-    },
-  },
-};
-
 const COACH_SYSTEM_PROMPT = [
   "You are an elite, supportive swimming coach for Aura Swimming Hub.",
   "Generate a precise daily set tailored to the swimmer's level, confidence, training history, water treading ability, and current goals.",
   "Respect the requested session duration and keep the total session within the requested minutes and never above 60 minutes.",
+  "Use conservative volume to ensure the set fits the requested time. Shorten the main set first if needed.",
   "Make the structure balanced and realistic for the time available.",
   "Factor in water treading / survival work when fear of deep water or low treading ability is present.",
-  "Return strictly valid JSON only. No markdown, no code fences, no commentary.",
-  "Use the provided JSON schema exactly. Do not add extra keys.",
+  "Keep every string value on a single line with no line breaks.",
+  "Return ONLY a valid JSON object. No markdown, no code fences, no commentary.",
+  "Use keys: workout_title, focus, warm_up, main_set, treading_drills, cool_down.",
+  "Each warm_up/main_set/cool_down item: description (string), distance (string), reps (number).",
+  "Each treading_drills item: description (string), duration (string).",
+  "Do not add extra keys.",
 ].join(" ");
 
 const OPENAI_TIMEOUT_MS = 25000;
@@ -110,6 +56,243 @@ function extractJsonPayload(text: string): string {
   }
 
   return stripped;
+}
+
+function parseJsonPayload(payload: string): Record<string, unknown> {
+  try {
+    return JSON.parse(payload) as Record<string, unknown>;
+  } catch {
+    const cleaned = sanitizeJsonString(payload).trim();
+    try {
+      return JSON.parse(cleaned) as Record<string, unknown>;
+    } catch {
+      const withoutTrailingCommas = cleaned.replace(/,\s*([}\]])/g, "$1");
+      return JSON.parse(withoutTrailingCommas) as Record<string, unknown>;
+    }
+  }
+}
+
+type GeminiTextResponse = {
+  text?: () => string;
+  candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+};
+
+function getGeminiResponseText(response: GeminiTextResponse): string {
+  const candidateText = response.candidates?.[0]?.content?.parts
+    ?.map((part) => (typeof part.text === "string" ? part.text : ""))
+    .join("")
+    .trim();
+
+  if (candidateText) {
+    return candidateText;
+  }
+
+  return typeof response.text === "function" ? response.text() : "";
+}
+
+function sanitizeJsonString(payload: string): string {
+  let output = "";
+  let inString = false;
+  let isEscaped = false;
+
+  for (let i = 0; i < payload.length; i += 1) {
+    const ch = payload[i];
+    const code = ch.charCodeAt(0);
+
+    if (inString) {
+      if (isEscaped) {
+        isEscaped = false;
+        output += ch;
+        continue;
+      }
+
+      if (ch === "\\") {
+        isEscaped = true;
+        output += ch;
+        continue;
+      }
+
+      if (ch === '"') {
+        inString = false;
+        output += ch;
+        continue;
+      }
+
+      if (code < 32) {
+        if (ch === "\n" || ch === "\r") {
+          output += "\\n";
+        } else if (ch === "\t") {
+          output += "\\t";
+        } else {
+          output += " ";
+        }
+        continue;
+      }
+
+      output += ch;
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = true;
+      output += ch;
+      continue;
+    }
+
+    if (code < 32) {
+      continue;
+    }
+
+    output += ch;
+  }
+
+  return output;
+}
+
+function isRetryableGeminiError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+  return message.includes("503") ||
+    message.includes("service unavailable") ||
+    message.includes("high demand");
+}
+
+async function generateWithRetry(
+  model: ReturnType<GoogleGenerativeAI["getGenerativeModel"]>,
+  request: Parameters<ReturnType<GoogleGenerativeAI["getGenerativeModel"]>["generateContent"]>[0],
+): Promise<Awaited<ReturnType<ReturnType<GoogleGenerativeAI["getGenerativeModel"]>["generateContent"]>>> {
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await model.generateContent(request, { timeout: OPENAI_TIMEOUT_MS });
+    } catch (error) {
+      lastError = error;
+      if (!isRetryableGeminiError(error) || attempt === 2) {
+        throw error;
+      }
+
+      const delayMs = 1000 * (attempt + 1);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+
+  throw lastError;
+}
+
+function trimWorkoutToMinutes(
+  workout: GeneratedWorkout,
+  targetMinutes: number,
+  preferKeepTreading: boolean,
+): GeneratedWorkout {
+  const limit = Math.max(15, Math.min(60, targetMinutes));
+  const sections = {
+    warm_up: [...workout.warm_up],
+    main_set: [...workout.main_set],
+    treading_drills: [...workout.treading_drills],
+    cool_down: [...workout.cool_down],
+  };
+
+  const minKeep = {
+    warm_up: sections.warm_up.length > 0 ? 1 : 0,
+    main_set: sections.main_set.length > 0 ? 1 : 0,
+    treading_drills: preferKeepTreading && sections.treading_drills.length > 0 ? 1 : 0,
+    cool_down: sections.cool_down.length > 0 ? 1 : 0,
+  };
+
+  const trimOrder = preferKeepTreading
+    ? ["main_set", "warm_up", "cool_down", "treading_drills"]
+    : ["main_set", "treading_drills", "warm_up", "cool_down"];
+
+  let estimated = estimateTotalTimeMinutes(sections as unknown as Record<string, unknown>);
+  while (estimated > limit) {
+    let removed = false;
+    for (const section of trimOrder) {
+      if (sections[section].length > minKeep[section]) {
+        sections[section].pop();
+        removed = true;
+        break;
+      }
+    }
+    if (!removed) {
+      break;
+    }
+    estimated = estimateTotalTimeMinutes(sections as unknown as Record<string, unknown>);
+  }
+
+  return {
+    ...workout,
+    ...sections,
+    estimatedMinutes: estimated,
+  };
+}
+
+function buildFallbackWorkout(
+  input: {
+    requestedMinutes: number;
+    swimmerProfile: SwimmerProfile | null;
+  },
+  preferKeepTreading: boolean,
+): GeneratedWorkout {
+  const level = input.swimmerProfile?.level ?? "beginner";
+  const stroke = input.swimmerProfile?.preferredStrokes?.[0] ?? "freestyle";
+  const goals = input.swimmerProfile?.fitnessGoals ?? [];
+  const goalText = goals.length > 0 ? goals.join(", ") : "endurance";
+
+  const levelLabelMap: Record<string, string> = {
+    beginner: "Beginner",
+    intermediate: "Intermediate",
+    advanced: "Advanced",
+    competitive: "Competitive",
+  };
+
+  const levelLabel = levelLabelMap[level] ?? "Beginner";
+
+  const levelConfig = {
+    beginner: { warm: "100m", main: "50m", mainReps: 4, drillReps: 4, cool: "100m" },
+    intermediate: { warm: "200m", main: "100m", mainReps: 4, drillReps: 4, cool: "150m" },
+    advanced: { warm: "300m", main: "100m", mainReps: 6, drillReps: 6, cool: "200m" },
+    competitive: { warm: "400m", main: "100m", mainReps: 8, drillReps: 6, cool: "300m" },
+  } as const;
+
+  const config = levelConfig[level] ?? levelConfig.beginner;
+
+  const draft: Record<string, unknown> = {
+    workout_title: `${levelLabel} ${stroke} session`,
+    focus: `${levelLabel} focus on ${goalText} using ${stroke}`,
+    warm_up: [
+      { description: `Easy ${stroke} swim`, distance: config.warm, reps: 1 },
+      { description: `${stroke} kick with board, relaxed pace`, distance: "50m", reps: 2 },
+      { description: `${stroke} technique drill (focus on form)`, distance: "25m", reps: 4 },
+    ],
+    main_set: [
+      { description: `${stroke} steady pace`, distance: config.main, reps: config.mainReps },
+      { description: `${stroke} build pace each 25m`, distance: "50m", reps: config.drillReps },
+      { description: `${stroke} smooth rhythm, controlled breathing`, distance: config.main, reps: Math.max(2, Math.floor(config.mainReps / 2)) },
+    ],
+    treading_drills: preferKeepTreading
+      ? [
+          { description: "Eggbeater kick, hands out of water", duration: "1 minute" },
+          { description: "Sculling for balance and control", duration: "1 minute" },
+        ]
+      : [
+          { description: "Light treading, focus on posture", duration: "1 minute" },
+        ],
+    cool_down: [
+      { description: `Easy ${stroke} swim`, distance: config.cool, reps: 1 },
+      { description: "Gentle choice stroke", distance: "50m", reps: 1 },
+    ],
+  };
+
+  const normalized = normalizeWorkout(draft, input.requestedMinutes);
+  if (normalized.estimatedMinutes > input.requestedMinutes) {
+    return trimWorkoutToMinutes(normalized, input.requestedMinutes, preferKeepTreading);
+  }
+
+  return normalized;
 }
 
 function parseBearerToken(request: NextRequest): string | null {
@@ -256,46 +439,84 @@ async function fetchWorkoutFromLlm(input: {
     model: modelName,
   });
 
+  const maxMinutes = Math.min(60, input.requestedMinutes);
+  const preferKeepTreading = Boolean(input.swimmerProfile?.fearOfDeepWater) ||
+    (input.swimmerProfile?.waterTreadingCapabilitySeconds ?? 0) < 60;
+
   try {
-    const result = await model.generateContent({
-      contents: [{
-        role: "user",
-        parts: [{
-          text: COACH_SYSTEM_PROMPT + "\n\n" + JSON.stringify({
-            requested_minutes: input.requestedMinutes,
-            swimmer_profile: input.swimmerProfile ?? null,
-            booking_history: input.history,
-          })
-        }]
-      }],
-      generationConfig: {
-        temperature: 0.4,
-        maxOutputTokens: 1200,
-        responseMimeType: "application/json",
-        responseSchema: WORKOUT_JSON_SCHEMA.schema as Schema,
-      },
-    }, { timeout: OPENAI_TIMEOUT_MS });
+    let lastEstimate: number | null = null;
 
-    const content = result.response.text();
-    if (!content) {
-      throw new Error("LLM returned empty content");
-    }
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const retryNote = attempt === 0
+        ? ""
+        : `Your previous response was estimated at ${lastEstimate ?? "over"} minutes. ` +
+          `Reduce the volume to <= ${maxMinutes} minutes by shortening the main set first.`;
 
-    try {
-      const jsonPayload = extractJsonPayload(content);
-      const parsed = JSON.parse(jsonPayload) as Record<string, unknown>;
-      const normalized = normalizeWorkout(parsed, input.requestedMinutes);
+      const result = await generateWithRetry(model, {
+        contents: [{
+          role: "user",
+          parts: [{
+            text: COACH_SYSTEM_PROMPT +
+              (retryNote ? `\n\n${retryNote}` : "") +
+              "\n\n" +
+              JSON.stringify({
+                requested_minutes: input.requestedMinutes,
+                swimmer_profile: input.swimmerProfile ?? null,
+                booking_history: input.history,
+              }),
+          }],
+        }],
+        generationConfig: {
+          temperature: 0.4,
+          maxOutputTokens: 1200,
+          responseMimeType: "application/json",
+        },
+      });
 
-      if (normalized.estimatedMinutes > 60) {
-        // Log this internally in production, clamped for now
+      const content = getGeminiResponseText(result.response as GeminiTextResponse);
+      if (!content) {
+        if (attempt === 0) {
+          continue;
+        }
+        console.warn("LLM returned empty content; using fallback workout.");
+        return buildFallbackWorkout(input, preferKeepTreading);
       }
 
-      return normalized;
-    } catch(err) {
-      console.error(err);
-      throw new Error("LLM response was not valid JSON");
+      try {
+        const jsonPayload = extractJsonPayload(content);
+        const parsed = parseJsonPayload(jsonPayload);
+        const normalized = normalizeWorkout(parsed, input.requestedMinutes);
+
+        if (normalized.estimatedMinutes > maxMinutes) {
+          lastEstimate = normalized.estimatedMinutes;
+          if (attempt === 0) {
+            continue;
+          }
+
+          return trimWorkoutToMinutes(normalized, maxMinutes, preferKeepTreading);
+        }
+
+        return normalized;
+      } catch (err) {
+        console.error(err);
+        console.error("LLM raw response length:", content.length);
+        console.error("LLM raw response tail:", JSON.stringify(content.slice(-120)));
+        console.error("LLM raw response:", content);
+        if (attempt === 0) {
+          continue;
+        }
+        console.warn("LLM JSON invalid after retry; using fallback workout.");
+        return buildFallbackWorkout(input, preferKeepTreading);
+      }
     }
+
+    console.warn("Falling back to deterministic workout due to invalid JSON response.");
+    return buildFallbackWorkout(input, preferKeepTreading);
   } catch (error) {
+    if (isRetryableGeminiError(error)) {
+      console.warn("Falling back to deterministic workout due to LLM availability.");
+      return buildFallbackWorkout(input, preferKeepTreading);
+    }
     if (error instanceof Error && (error.name === "AbortError" || error.message.includes("timeout"))) {
       throw new Error("AI generation timed out. Please try again.");
     }
