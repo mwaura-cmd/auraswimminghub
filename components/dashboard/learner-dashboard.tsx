@@ -8,7 +8,7 @@ import { useAuth } from "@/components/providers/auth-provider";
 import { formatSessionDate, formatSessionTime, getSessionDate, isUpcomingBooking } from "@/lib/booking-utils";
 import { BILLING_CYCLES, BILLING_CYCLE_LABEL, formatKes } from "@/lib/pricing";
 import { subscribeBookings, subscribeUserProfile } from "@/lib/realtimedb";
-import { auth } from "@/lib/firebase";
+import { getFirebaseAuth } from "@/lib/firebase";
 import { AttendanceStatus, Booking, GeneratedWorkout, PlatformUser, SwimLevel, SwimmerProfile } from "@/lib/types";
 
 function toAttendanceStatus(status?: AttendanceStatus): AttendanceStatus {
@@ -322,7 +322,7 @@ export function LearnerDashboard() {
     let timeoutHandle: number | undefined;
 
     try {
-      const currentAuth = auth;
+      const currentAuth = getFirebaseAuth();
       const currentUser = currentAuth?.currentUser;
 
       if (!currentAuth || !currentUser) {
