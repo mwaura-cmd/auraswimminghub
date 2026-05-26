@@ -1,7 +1,7 @@
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getDatabase } from "firebase/database";
-import { getFirestore } from "firebase/firestore";
+import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
+import { getAuth, type Auth } from "firebase/auth";
+import { getDatabase, type Database } from "firebase/database";
+import { getFirestore, type Firestore } from "firebase/firestore";
 
 type FirebasePublicConfig = {
   apiKey?: string;
@@ -42,7 +42,7 @@ function getFirebaseConfig() {
   };
 }
 
-export function isFirebaseConfigured() {
+export function isFirebaseConfigured(): boolean {
   const firebaseConfig = getFirebaseConfig();
   return Boolean(
     firebaseConfig.apiKey &&
@@ -54,7 +54,7 @@ export function isFirebaseConfigured() {
   );
 }
 
-export function getFirebaseApp() {
+export function getFirebaseApp(): FirebaseApp | null {
   const firebaseConfig = getFirebaseConfig();
   if (!isFirebaseConfigured()) {
     return null;
@@ -63,17 +63,17 @@ export function getFirebaseApp() {
   return getApps().length ? getApp() : initializeApp(firebaseConfig);
 }
 
-export function getFirebaseAuth() {
+export function getFirebaseAuth(): Auth | null {
   const app = getFirebaseApp();
   return app ? getAuth(app) : null;
 }
 
-export function getFirebaseRtdb() {
+export function getFirebaseRtdb(): Database | null {
   const app = getFirebaseApp();
   return app ? getDatabase(app) : null;
 }
 
-export function getFirebaseDb() {
+export function getFirebaseDb(): Firestore | null {
   const app = getFirebaseApp();
   return app ? getFirestore(app) : null;
 }
