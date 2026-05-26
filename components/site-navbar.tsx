@@ -8,7 +8,7 @@ import { LogOut, MoreVertical, X } from "lucide-react";
 import { signOut } from "firebase/auth";
 import { NAV_LINKS } from "@/lib/constants";
 import { clearDemoSession } from "@/lib/demo-auth";
-import { auth } from "@/lib/firebase";
+import { getFirebaseAuth } from "@/lib/firebase";
 import { useAuth } from "@/components/providers/auth-provider";
 import { cn } from "@/lib/utils";
 
@@ -24,10 +24,11 @@ export function SiteNavbar() {
     setIsMobileMenuOpen(false);
 
     try {
+      const firebaseAuth = getFirebaseAuth();
       if (isDemoMode) {
         clearDemoSession();
-      } else if (auth) {
-        await signOut(auth);
+      } else if (firebaseAuth) {
+        await signOut(firebaseAuth);
       }
 
       router.push("/login");

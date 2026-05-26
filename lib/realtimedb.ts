@@ -1,6 +1,6 @@
 import { equalTo, get, onValue, orderByChild, push, query, ref, set, update } from "firebase/database";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth, rtdb, isFirebaseConfigured } from "@/lib/firebase";
+import { getFirebaseAuth, getFirebaseRtdb, isFirebaseConfigured } from "@/lib/firebase";
 import { AttendanceStatus, Booking, BookingInput, GalleryItem, GalleryMediaType, PlatformUser, SwimmerProfile, UserRole } from "@/lib/types";
 
 function buildDefaultSwimmerProfile(): SwimmerProfile {
@@ -16,7 +16,9 @@ function buildDefaultSwimmerProfile(): SwimmerProfile {
 }
 
 export async function ensureUserProfile(role: UserRole, payload?: Partial<PlatformUser>) {
-  if (!isFirebaseConfigured || !auth || !rtdb) {
+  const auth = getFirebaseAuth();
+  const rtdb = getFirebaseRtdb();
+  if (!isFirebaseConfigured() || !auth || !rtdb) {
     throw new Error("Firebase not configured");
   }
 
@@ -51,7 +53,8 @@ export async function ensureUserProfile(role: UserRole, payload?: Partial<Platfo
 }
 
 export async function getUserProfile(uid: string): Promise<PlatformUser | null> {
-  if (!isFirebaseConfigured || !rtdb) {
+  const rtdb = getFirebaseRtdb();
+  if (!isFirebaseConfigured() || !rtdb) {
     return null;
   }
 
@@ -67,7 +70,8 @@ export async function getUserProfile(uid: string): Promise<PlatformUser | null> 
 }
 
 export async function findUserProfileByEmail(email: string): Promise<PlatformUser | null> {
-  if (!isFirebaseConfigured || !rtdb || !email) {
+  const rtdb = getFirebaseRtdb();
+  if (!isFirebaseConfigured() || !rtdb || !email) {
     return null;
   }
 
@@ -88,7 +92,8 @@ export function subscribeUserProfile(
   onProfile: (profile: PlatformUser | null) => void,
   onError?: (error: Error) => void,
 ) {
-  if (!isFirebaseConfigured || !rtdb || !uid) {
+  const rtdb = getFirebaseRtdb();
+  if (!isFirebaseConfigured() || !rtdb || !uid) {
     onProfile(null);
     return () => undefined;
   }
@@ -111,7 +116,9 @@ export function subscribeUserProfile(
 }
 
 export async function createBooking(data: BookingInput) {
-  if (!isFirebaseConfigured || !auth || !rtdb) {
+  const auth = getFirebaseAuth();
+  const rtdb = getFirebaseRtdb();
+  if (!isFirebaseConfigured() || !auth || !rtdb) {
     throw new Error("Firebase not configured");
   }
 
@@ -131,7 +138,8 @@ export async function createBooking(data: BookingInput) {
 }
 
 export async function getBookingCount(userId: string): Promise<number> {
-  if (!isFirebaseConfigured || !rtdb) {
+  const rtdb = getFirebaseRtdb();
+  if (!isFirebaseConfigured() || !rtdb) {
     return 0;
   }
 
@@ -148,7 +156,8 @@ export async function getBookingCount(userId: string): Promise<number> {
 }
 
 export function subscribeBookings(onBookings: (bookings: Booking[]) => void, onError?: (error: Error) => void) {
-  if (!isFirebaseConfigured || !rtdb) {
+  const rtdb = getFirebaseRtdb();
+  if (!isFirebaseConfigured() || !rtdb) {
     onBookings([]);
     return () => undefined;
   }
@@ -184,7 +193,8 @@ export function subscribeBookings(onBookings: (bookings: Booking[]) => void, onE
     );
   };
 
-  if (!auth) {
+  const firebaseAuth = getFirebaseAuth();
+  if (!firebaseAuth) {
     attachListener();
     return () => {
       disposed = true;
@@ -193,8 +203,6 @@ export function subscribeBookings(onBookings: (bookings: Booking[]) => void, onE
       }
     };
   }
-
-  const firebaseAuth = auth;
 
   const attachWhenReady = async () => {
     const currentUser = firebaseAuth.currentUser;
@@ -233,7 +241,9 @@ export function subscribeBookings(onBookings: (bookings: Booking[]) => void, onE
 }
 
 export async function markBookingAttendance(bookingId: string, attendanceStatus: AttendanceStatus) {
-  if (!isFirebaseConfigured || !auth || !rtdb) {
+  const auth = getFirebaseAuth();
+  const rtdb = getFirebaseRtdb();
+  if (!isFirebaseConfigured() || !auth || !rtdb) {
     throw new Error("Firebase not configured");
   }
 
@@ -261,7 +271,8 @@ interface CreateGalleryItemInput {
 }
 
 export async function createGalleryItem(input: CreateGalleryItemInput): Promise<string> {
-  if (!isFirebaseConfigured || !rtdb) {
+  const rtdb = getFirebaseRtdb();
+  if (!isFirebaseConfigured() || !rtdb) {
     throw new Error("Firebase not configured");
   }
 
@@ -281,7 +292,8 @@ export async function createGalleryItem(input: CreateGalleryItemInput): Promise<
 }
 
 export function subscribeGalleryItems(onItems: (items: GalleryItem[]) => void, onError?: (error: Error) => void) {
-  if (!isFirebaseConfigured || !rtdb) {
+  const rtdb = getFirebaseRtdb();
+  if (!isFirebaseConfigured() || !rtdb) {
     onItems([]);
     return () => undefined;
   }
@@ -312,7 +324,8 @@ export function subscribeGalleryItems(onItems: (items: GalleryItem[]) => void, o
 }
 
 export async function updateGalleryPinned(itemId: string, pinned: boolean) {
-  if (!isFirebaseConfigured || !rtdb) {
+  const rtdb = getFirebaseRtdb();
+  if (!isFirebaseConfigured() || !rtdb) {
     throw new Error("Firebase not configured");
   }
 
@@ -321,7 +334,8 @@ export async function updateGalleryPinned(itemId: string, pinned: boolean) {
 }
 
 export async function updateGalleryCaption(itemId: string, caption: string) {
-  if (!isFirebaseConfigured || !rtdb) {
+  const rtdb = getFirebaseRtdb();
+  if (!isFirebaseConfigured() || !rtdb) {
     throw new Error("Firebase not configured");
   }
 
@@ -330,7 +344,8 @@ export async function updateGalleryCaption(itemId: string, caption: string) {
 }
 
 export async function deleteGalleryItem(itemId: string) {
-  if (!isFirebaseConfigured || !rtdb) {
+  const rtdb = getFirebaseRtdb();
+  if (!isFirebaseConfigured() || !rtdb) {
     throw new Error("Firebase not configured");
   }
 

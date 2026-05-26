@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { ref, onValue } from "firebase/database";
-import { auth, rtdb, isFirebaseConfigured } from "@/lib/firebase";
+import { getFirebaseAuth, getFirebaseRtdb, isFirebaseConfigured } from "@/lib/firebase";
 import { DEMO_AUTH_EVENT, getDemoSession } from "@/lib/demo-auth";
 import { normalizeRole } from "@/lib/roles";
 import { UserRole } from "@/lib/types";
@@ -26,7 +26,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [role, setRole] = useState<UserRole | null>(null);
   const [loading, setLoading] = useState(true);
-  const isDemoMode = !isFirebaseConfigured || !auth || !rtdb;
+  const firebaseAuth = getFirebaseAuth();
+  const database = getFirebaseRtdb();
+  const isDemoMode = !isFirebaseConfigured() || !firebaseAuth || !database;
 
   useEffect(() => {
     if (isDemoMode) {
@@ -52,8 +54,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
     }
 
-    const firebaseAuth = auth!;
-    const database = rtdb!;
+    const firebaseAuth = getFirebaseAuth();
+    const database = getFirebaseRtdb();
+    if (!firebaseAuth || !database) {
+      setLoading(false);
+      return;
+    }
 
     const loadingGuard = window.setTimeout(() => {
       const current = firebaseAuth.currentUser;

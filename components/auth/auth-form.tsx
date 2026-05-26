@@ -9,7 +9,7 @@ import {
   signInWithPopup,
   updateProfile,
 } from "firebase/auth";
-import { auth, isFirebaseConfigured, rtdb } from "@/lib/firebase";
+import { getFirebaseAuth, getFirebaseRtdb, isFirebaseConfigured } from "@/lib/firebase";
 import { DEMO_ACCOUNTS, findDemoAccount, setDemoSession } from "@/lib/demo-auth";
 import { ensureUserProfile, getUserProfile } from "@/lib/realtimedb";
 import { ROLE_ROUTES } from "@/lib/constants";
@@ -99,7 +99,9 @@ export function AuthForm() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
-  const isDemoMode = !isFirebaseConfigured || !auth || !rtdb;
+  const firebaseAuth = getFirebaseAuth();
+  const database = getFirebaseRtdb();
+  const isDemoMode = !isFirebaseConfigured() || !firebaseAuth || !database;
 
   const onGoogleSignIn = async () => {
     setError("");
@@ -110,7 +112,10 @@ export function AuthForm() {
         throw new Error("Google sign-in is unavailable in demo mode.");
       }
 
-      const firebaseAuth = auth!;
+      const firebaseAuth = getFirebaseAuth();
+      if (!firebaseAuth) {
+        throw new Error("Firebase is not configured.");
+      }
       const provider = new GoogleAuthProvider();
       const credential = await signInWithPopup(firebaseAuth, provider);
 
@@ -155,7 +160,10 @@ export function AuthForm() {
         return;
       }
 
-      const firebaseAuth = auth!;
+      const firebaseAuth = getFirebaseAuth();
+      if (!firebaseAuth) {
+        throw new Error("Firebase is not configured.");
+      }
 
       if (mode === "signup") {
         if (role !== "student" && role !== "parent") {

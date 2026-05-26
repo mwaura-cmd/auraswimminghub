@@ -11,15 +11,24 @@ import {
   setDoc,
   where,
 } from "firebase/firestore";
-import { auth, db, isFirebaseConfigured } from "@/lib/firebase";
+import { getFirebaseAuth, getFirebaseDb, isFirebaseConfigured } from "@/lib/firebase";
 import { BookingInput, PlatformUser, UserRole } from "@/lib/types";
 
 export async function ensureUserProfile(role: UserRole, payload?: Partial<PlatformUser>) {
-  if (!isFirebaseConfigured || !auth || !db) {
+  if (!isFirebaseConfigured()) {
+    throw new Error("Firebase not configured");
+  }
+
+  const auth = getFirebaseAuth();
+  if (!auth) {
     throw new Error("Firebase not configured");
   }
 
   const currentUser = auth.currentUser;
+  const db = getFirebaseDb();
+  if (!db) {
+    throw new Error("Firebase not configured");
+  }
   if (!currentUser) {
     return;
   }
@@ -39,11 +48,20 @@ export async function ensureUserProfile(role: UserRole, payload?: Partial<Platfo
 }
 
 export async function createBooking(data: BookingInput) {
-  if (!isFirebaseConfigured || !auth || !db) {
+  if (!isFirebaseConfigured()) {
+    throw new Error("Firebase not configured");
+  }
+
+  const auth = getFirebaseAuth();
+  if (!auth) {
     throw new Error("Firebase not configured");
   }
 
   const currentUser = auth.currentUser;
+  const db = getFirebaseDb();
+  if (!db) {
+    throw new Error("Firebase not configured");
+  }
   const payload = {
     ...data,
     status: "pending",
@@ -74,7 +92,12 @@ export async function createBooking(data: BookingInput) {
 }
 
 export async function getUpcomingSessions(userId: string) {
-  if (!isFirebaseConfigured || !db) {
+  if (!isFirebaseConfigured()) {
+    return [];
+  }
+
+  const db = getFirebaseDb();
+  if (!db) {
     return [];
   }
 
