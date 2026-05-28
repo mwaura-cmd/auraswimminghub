@@ -33,7 +33,7 @@ function formatKes(amount?: number) {
   return `KES ${new Intl.NumberFormat("en-KE").format(amount ?? 0)}`;
 }
 
-function buildLearnerEmail(booking: BookingRecord, bookingId: string) {
+function buildLearnerConfirmedEmail(booking: BookingRecord, bookingId: string) {
   const name = booking.fullName ?? "there";
   const learner = booking.learnerName ?? "your learner";
   const program = booking.program ?? "your session";
@@ -67,7 +67,7 @@ function buildLearnerEmail(booking: BookingRecord, bookingId: string) {
   return { subject, text, html };
 }
 
-function buildAdminEmail(booking: BookingRecord, bookingId: string) {
+function buildAdminConfirmedEmail(booking: BookingRecord, bookingId: string) {
   const learner = booking.learnerName ?? "(unknown learner)";
   const name = booking.fullName ?? "(unknown guardian)";
   const email = booking.email ?? "(no email)";
@@ -91,6 +91,76 @@ function buildAdminEmail(booking: BookingRecord, bookingId: string) {
 
   const html =
     `<p><strong>New booking confirmed</strong></p>` +
+    `<p><strong>Learner:</strong> ${learner}<br/>` +
+    `<strong>Guardian:</strong> ${name}<br/>` +
+    `<strong>Email:</strong> ${email}<br/>` +
+    `<strong>Program:</strong> ${program}<br/>` +
+    `<strong>Date:</strong> ${date}<br/>` +
+    `<strong>Time:</strong> ${time}<br/>` +
+    `<strong>Amount:</strong> ${amount}<br/>` +
+    `<strong>Reference:</strong> ${reference}</p>`;
+
+  return { subject, text, html };
+}
+
+function buildLearnerPendingEmail(booking: BookingRecord, bookingId: string) {
+  const name = booking.fullName ?? "there";
+  const learner = booking.learnerName ?? "your learner";
+  const program = booking.program ?? "your session";
+  const date = booking.date ?? "TBD";
+  const time = booking.time ?? "TBD";
+  const amount = formatKes(booking.amountKes);
+  const reference = booking.paystackReference ?? bookingId;
+
+  const subject = "Booking received - pending payment";
+  const text =
+    `Hi ${name},\n\n` +
+    `We received your booking for ${learner}.\n` +
+    `Program: ${program}\n` +
+    `Date: ${date}\n` +
+    `Time: ${time}\n` +
+    `Amount: ${amount}\n` +
+    `Reference: ${reference}\n\n` +
+    `Complete payment to confirm your session.\n` +
+    `Aura Swimming Hub`;
+
+  const html =
+    `<p>Hi ${name},</p>` +
+    `<p>We received your booking for <strong>${learner}</strong>.</p>` +
+    `<p><strong>Program:</strong> ${program}<br/>` +
+    `<strong>Date:</strong> ${date}<br/>` +
+    `<strong>Time:</strong> ${time}<br/>` +
+    `<strong>Amount:</strong> ${amount}<br/>` +
+    `<strong>Reference:</strong> ${reference}</p>` +
+    `<p>Complete payment to confirm your session.<br/>Aura Swimming Hub</p>`;
+
+  return { subject, text, html };
+}
+
+function buildAdminPendingEmail(booking: BookingRecord, bookingId: string) {
+  const learner = booking.learnerName ?? "(unknown learner)";
+  const name = booking.fullName ?? "(unknown guardian)";
+  const email = booking.email ?? "(no email)";
+  const program = booking.program ?? "(no program)";
+  const date = booking.date ?? "TBD";
+  const time = booking.time ?? "TBD";
+  const amount = formatKes(booking.amountKes);
+  const reference = booking.paystackReference ?? bookingId;
+
+  const subject = "New booking received";
+  const text =
+    `New booking received (pending payment).\n` +
+    `Learner: ${learner}\n` +
+    `Guardian: ${name}\n` +
+    `Email: ${email}\n` +
+    `Program: ${program}\n` +
+    `Date: ${date}\n` +
+    `Time: ${time}\n` +
+    `Amount: ${amount}\n` +
+    `Reference: ${reference}`;
+
+  const html =
+    `<p><strong>New booking received (pending payment)</strong></p>` +
     `<p><strong>Learner:</strong> ${learner}<br/>` +
     `<strong>Guardian:</strong> ${name}<br/>` +
     `<strong>Email:</strong> ${email}<br/>` +
@@ -138,16 +208,30 @@ async function sendResendEmail(params: {
   }
 }
 
-async function sendBookingEmails(booking: BookingRecord, bookingId: string) {
+async function sendBookingConfirmedEmails(booking: BookingRecord, bookingId: string) {
   const learnerEmail = booking.email;
   if (learnerEmail) {
-    const message = buildLearnerEmail(booking, bookingId);
+    const message = buildLearnerConfirmedEmail(booking, bookingId);
     await sendResendEmail({ to: learnerEmail, ...message });
   }
 
   const adminEmail = process.env.BOOKING_ADMIN_EMAIL;
   if (adminEmail) {
-    const message = buildAdminEmail(booking, bookingId);
+    const message = buildAdminConfirmedEmail(booking, bookingId);
+    await sendResendEmail({ to: adminEmail, ...message });
+  }
+}
+
+async function sendBookingPendingEmails(booking: BookingRecord, bookingId: string) {
+  const learnerEmail = booking.email;
+  if (learnerEmail) {
+    const message = buildLearnerPendingEmail(booking, bookingId);
+    await sendResendEmail({ to: learnerEmail, ...message });
+  }
+
+  const adminEmail = process.env.BOOKING_ADMIN_EMAIL;
+  if (adminEmail) {
+    const message = buildAdminPendingEmail(booking, bookingId);
     await sendResendEmail({ to: adminEmail, ...message });
   }
 }
@@ -166,6 +250,17 @@ export const bookingConfirmation = onDocumentCreated("bookings/{bookingId}", asy
   });
 });
 
+export const bookingCreatedEmail = onValueWritten("/bookings/{bookingId}", async (event) => {
+  const beforeExists = event.data.before.exists();
+  const after = event.data.after.val() as BookingRecord | null;
+
+  if (beforeExists || !after) {
+    return;
+  }
+
+  await sendBookingPendingEmails(after, event.params.bookingId);
+});
+
 export const bookingPaidEmail = onValueWritten("/bookings/{bookingId}", async (event) => {
   const before = event.data.before.val() as BookingRecord | null;
   const after = event.data.after.val() as BookingRecord | null;
@@ -181,7 +276,7 @@ export const bookingPaidEmail = onValueWritten("/bookings/{bookingId}", async (e
     return;
   }
 
-  await sendBookingEmails(after, event.params.bookingId);
+  await sendBookingConfirmedEmails(after, event.params.bookingId);
 });
 
 export const inviteAfterTwoBookings = onDocumentCreated("bookings/{bookingId}", async (event) => {

@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.paymentReminders = exports.certificateGeneration = exports.assessmentReminder = exports.inviteAfterTwoBookings = exports.bookingPaidEmail = exports.bookingConfirmation = void 0;
+exports.paymentReminders = exports.certificateGeneration = exports.assessmentReminder = exports.inviteAfterTwoBookings = exports.bookingPaidEmail = exports.bookingCreatedEmail = exports.bookingConfirmation = void 0;
 const admin = __importStar(require("firebase-admin"));
 const firestore_1 = require("firebase-functions/firestore");
 const database_1 = require("firebase-functions/v2/database");
@@ -50,7 +50,7 @@ function formatKes(amount) {
     }
     return `KES ${new Intl.NumberFormat("en-KE").format(amount ?? 0)}`;
 }
-function buildLearnerEmail(booking, bookingId) {
+function buildLearnerConfirmedEmail(booking, bookingId) {
     const name = booking.fullName ?? "there";
     const learner = booking.learnerName ?? "your learner";
     const program = booking.program ?? "your session";
@@ -78,7 +78,7 @@ function buildLearnerEmail(booking, bookingId) {
         `<p>We look forward to seeing you in the pool.<br/>Aura Swimming Hub</p>`;
     return { subject, text, html };
 }
-function buildAdminEmail(booking, bookingId) {
+function buildAdminConfirmedEmail(booking, bookingId) {
     const learner = booking.learnerName ?? "(unknown learner)";
     const name = booking.fullName ?? "(unknown guardian)";
     const email = booking.email ?? "(no email)";
@@ -98,6 +98,64 @@ function buildAdminEmail(booking, bookingId) {
         `Amount: ${amount}\n` +
         `Reference: ${reference}`;
     const html = `<p><strong>New booking confirmed</strong></p>` +
+        `<p><strong>Learner:</strong> ${learner}<br/>` +
+        `<strong>Guardian:</strong> ${name}<br/>` +
+        `<strong>Email:</strong> ${email}<br/>` +
+        `<strong>Program:</strong> ${program}<br/>` +
+        `<strong>Date:</strong> ${date}<br/>` +
+        `<strong>Time:</strong> ${time}<br/>` +
+        `<strong>Amount:</strong> ${amount}<br/>` +
+        `<strong>Reference:</strong> ${reference}</p>`;
+    return { subject, text, html };
+}
+function buildLearnerPendingEmail(booking, bookingId) {
+    const name = booking.fullName ?? "there";
+    const learner = booking.learnerName ?? "your learner";
+    const program = booking.program ?? "your session";
+    const date = booking.date ?? "TBD";
+    const time = booking.time ?? "TBD";
+    const amount = formatKes(booking.amountKes);
+    const reference = booking.paystackReference ?? bookingId;
+    const subject = "Booking received - pending payment";
+    const text = `Hi ${name},\n\n` +
+        `We received your booking for ${learner}.\n` +
+        `Program: ${program}\n` +
+        `Date: ${date}\n` +
+        `Time: ${time}\n` +
+        `Amount: ${amount}\n` +
+        `Reference: ${reference}\n\n` +
+        `Complete payment to confirm your session.\n` +
+        `Aura Swimming Hub`;
+    const html = `<p>Hi ${name},</p>` +
+        `<p>We received your booking for <strong>${learner}</strong>.</p>` +
+        `<p><strong>Program:</strong> ${program}<br/>` +
+        `<strong>Date:</strong> ${date}<br/>` +
+        `<strong>Time:</strong> ${time}<br/>` +
+        `<strong>Amount:</strong> ${amount}<br/>` +
+        `<strong>Reference:</strong> ${reference}</p>` +
+        `<p>Complete payment to confirm your session.<br/>Aura Swimming Hub</p>`;
+    return { subject, text, html };
+}
+function buildAdminPendingEmail(booking, bookingId) {
+    const learner = booking.learnerName ?? "(unknown learner)";
+    const name = booking.fullName ?? "(unknown guardian)";
+    const email = booking.email ?? "(no email)";
+    const program = booking.program ?? "(no program)";
+    const date = booking.date ?? "TBD";
+    const time = booking.time ?? "TBD";
+    const amount = formatKes(booking.amountKes);
+    const reference = booking.paystackReference ?? bookingId;
+    const subject = "New booking received";
+    const text = `New booking received (pending payment).\n` +
+        `Learner: ${learner}\n` +
+        `Guardian: ${name}\n` +
+        `Email: ${email}\n` +
+        `Program: ${program}\n` +
+        `Date: ${date}\n` +
+        `Time: ${time}\n` +
+        `Amount: ${amount}\n` +
+        `Reference: ${reference}`;
+    const html = `<p><strong>New booking received (pending payment)</strong></p>` +
         `<p><strong>Learner:</strong> ${learner}<br/>` +
         `<strong>Guardian:</strong> ${name}<br/>` +
         `<strong>Email:</strong> ${email}<br/>` +
@@ -134,15 +192,27 @@ async function sendResendEmail(params) {
         firebase_functions_1.logger.error("Resend email failed", { status: response.status, errorText });
     }
 }
-async function sendBookingEmails(booking, bookingId) {
+async function sendBookingConfirmedEmails(booking, bookingId) {
     const learnerEmail = booking.email;
     if (learnerEmail) {
-        const message = buildLearnerEmail(booking, bookingId);
+        const message = buildLearnerConfirmedEmail(booking, bookingId);
         await sendResendEmail({ to: learnerEmail, ...message });
     }
     const adminEmail = process.env.BOOKING_ADMIN_EMAIL;
     if (adminEmail) {
-        const message = buildAdminEmail(booking, bookingId);
+        const message = buildAdminConfirmedEmail(booking, bookingId);
+        await sendResendEmail({ to: adminEmail, ...message });
+    }
+}
+async function sendBookingPendingEmails(booking, bookingId) {
+    const learnerEmail = booking.email;
+    if (learnerEmail) {
+        const message = buildLearnerPendingEmail(booking, bookingId);
+        await sendResendEmail({ to: learnerEmail, ...message });
+    }
+    const adminEmail = process.env.BOOKING_ADMIN_EMAIL;
+    if (adminEmail) {
+        const message = buildAdminPendingEmail(booking, bookingId);
         await sendResendEmail({ to: adminEmail, ...message });
     }
 }
@@ -158,6 +228,14 @@ exports.bookingConfirmation = (0, firestore_1.onDocumentCreated)("bookings/{book
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 });
+exports.bookingCreatedEmail = (0, database_1.onValueWritten)("/bookings/{bookingId}", async (event) => {
+    const beforeExists = event.data.before.exists();
+    const after = event.data.after.val();
+    if (beforeExists || !after) {
+        return;
+    }
+    await sendBookingPendingEmails(after, event.params.bookingId);
+});
 exports.bookingPaidEmail = (0, database_1.onValueWritten)("/bookings/{bookingId}", async (event) => {
     const before = event.data.before.val();
     const after = event.data.after.val();
@@ -169,7 +247,7 @@ exports.bookingPaidEmail = (0, database_1.onValueWritten)("/bookings/{bookingId}
     if (!isPaid || wasPaid) {
         return;
     }
-    await sendBookingEmails(after, event.params.bookingId);
+    await sendBookingConfirmedEmails(after, event.params.bookingId);
 });
 exports.inviteAfterTwoBookings = (0, firestore_1.onDocumentCreated)("bookings/{bookingId}", async (event) => {
     const booking = event.data?.data();
