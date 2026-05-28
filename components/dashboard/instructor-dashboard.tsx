@@ -230,7 +230,7 @@ export function InstructorDashboard() {
                 <p className="font-semibold text-teal-100">{item.program}</p>
                 <p className="text-xs text-teal-50/70">{item.time}</p>
               </div>
-              <p className="mt-1 text-xs text-teal-50/70">{item.learners} learners • {formatKes(item.projectedRevenueKes)}</p>
+              <p className="mt-1 text-xs text-teal-50/70">{item.learners} learners - {formatKes(item.projectedRevenueKes)}</p>
               <p className="mt-2 text-xs text-teal-100/70">Use Attendance Queue below to mark each learner present.</p>
             </div>
           ))}
@@ -241,7 +241,7 @@ export function InstructorDashboard() {
               <div className="mt-3 space-y-2 text-xs text-teal-100/80">
                 {upcomingSessions.map((item) => (
                   <p key={item.id}>
-                    {formatSessionDate(item)} {formatSessionTime(item)} • {item.program} • {item.learnerName}
+                    {formatSessionDate(item)} {formatSessionTime(item)} - {item.program} - {item.learnerName}
                   </p>
                 ))}
               </div>

@@ -5,6 +5,7 @@ import "./globals.css";
 import { SiteNavbar } from "@/components/site-navbar";
 import { SiteFooter } from "@/components/site-footer";
 import { AuthProvider } from "@/components/providers/auth-provider";
+import { ScrollReveal } from "@/components/scroll-reveal";
 import { ScrollToTop } from "@/components/scroll-to-top";
 
 const inter = Inter({
@@ -59,6 +60,7 @@ export default function RootLayout({
             <SiteNavbar />
             <main className="flex-1 pt-24">{children}</main>
             <SiteFooter />
+            <ScrollReveal />
             <ScrollToTop />
           </div>
         </AuthProvider>
