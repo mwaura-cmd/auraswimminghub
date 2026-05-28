@@ -15,21 +15,21 @@ const sectionVariants = {
   show: {
     opacity: 1,
     transition: {
-      duration: 0.45,
+      duration: 0.32,
       ease: [0.22, 1, 0.36, 1],
-      staggerChildren: 0.08,
-      delayChildren: 0.04,
+      staggerChildren: 0.06,
+      delayChildren: 0.02,
     },
   },
 };
 
 const itemVariants = {
-  hidden: { opacity: 0, y: 16 },
+  hidden: { opacity: 0, y: 12 },
   show: {
     opacity: 1,
     y: 0,
     transition: {
-      duration: 0.5,
+      duration: 0.38,
       ease: [0.22, 1, 0.36, 1],
     },
   },

@@ -35,7 +35,7 @@ function addRevealClasses(elements: HTMLElement[]) {
       }
 
       if (!element.style.getPropertyValue("--reveal-delay")) {
-        const delay = Math.min(index * 60, 240);
+        const delay = Math.min(index * 40, 160);
         element.style.setProperty("--reveal-delay", `${delay}ms`);
       }
     });
@@ -79,7 +79,7 @@ export function ScrollReveal() {
           activeObserver.unobserve(target);
         });
       },
-      { threshold: 0.15, rootMargin: "0px 0px -10% 0px" },
+      { threshold: 0.12, rootMargin: "0px 0px -12% 0px" },
     );
 
     elements.forEach((element) => observer.observe(element));

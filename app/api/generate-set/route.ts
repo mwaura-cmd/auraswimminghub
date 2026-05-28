@@ -29,6 +29,8 @@ type GeneratedWorkout = {
 const COACH_SYSTEM_PROMPT = [
   "You are an elite, supportive swimming coach for Aura Swimming Hub.",
   "Generate a precise daily set tailored to the swimmer's level, confidence, training history, water treading ability, and current goals.",
+  "For beginner or fearful swimmers, cap continuous distances at 25m and avoid 50m/100m continuous repeats; use short repeats with rest.",
+  "Never assign 100m continuous swims for beginners; keep drills simple, low volume, and confidence-building.",
   "Respect the requested session duration and keep the total session within the requested minutes and never above 60 minutes.",
   "Use conservative volume to ensure the set fits the requested time. Shorten the main set first if needed.",
   "Make the structure balanced and realistic for the time available.",
@@ -254,25 +256,29 @@ function buildFallbackWorkout(
   const levelLabel = levelLabelMap[level] ?? "Beginner";
 
   const levelConfig = {
-    beginner: { warm: "100m", main: "50m", mainReps: 4, drillReps: 4, cool: "100m" },
+    beginner: { warm: "25m", main: "25m", mainReps: 4, drillReps: 4, cool: "25m" },
     intermediate: { warm: "200m", main: "100m", mainReps: 4, drillReps: 4, cool: "150m" },
     advanced: { warm: "300m", main: "100m", mainReps: 6, drillReps: 6, cool: "200m" },
     competitive: { warm: "400m", main: "100m", mainReps: 8, drillReps: 6, cool: "300m" },
   } as const;
 
   const config = levelConfig[level] ?? levelConfig.beginner;
+  const isBeginner = level === "beginner";
+  const kickDistance = isBeginner ? "25m" : "50m";
+  const buildDistance = isBeginner ? "25m" : "50m";
+  const gentleDistance = isBeginner ? "25m" : "50m";
 
   const draft: Record<string, unknown> = {
     workout_title: `${levelLabel} ${stroke} session`,
     focus: `${levelLabel} focus on ${goalText} using ${stroke}`,
     warm_up: [
       { description: `Easy ${stroke} swim`, distance: config.warm, reps: 1 },
-      { description: `${stroke} kick with board, relaxed pace`, distance: "50m", reps: 2 },
+      { description: `${stroke} kick with board, relaxed pace`, distance: kickDistance, reps: 2 },
       { description: `${stroke} technique drill (focus on form)`, distance: "25m", reps: 4 },
     ],
     main_set: [
       { description: `${stroke} steady pace`, distance: config.main, reps: config.mainReps },
-      { description: `${stroke} build pace each 25m`, distance: "50m", reps: config.drillReps },
+      { description: `${stroke} build pace each 25m`, distance: buildDistance, reps: config.drillReps },
       { description: `${stroke} smooth rhythm, controlled breathing`, distance: config.main, reps: Math.max(2, Math.floor(config.mainReps / 2)) },
     ],
     treading_drills: preferKeepTreading
@@ -285,11 +291,11 @@ function buildFallbackWorkout(
         ],
     cool_down: [
       { description: `Easy ${stroke} swim`, distance: config.cool, reps: 1 },
-      { description: "Gentle choice stroke", distance: "50m", reps: 1 },
+      { description: "Gentle choice stroke", distance: gentleDistance, reps: 1 },
     ],
   };
 
-  const normalized = normalizeWorkout(draft, input.requestedMinutes);
+  const normalized = applyBeginnerDistanceCap(normalizeWorkout(draft, input.requestedMinutes), input.swimmerProfile);
   if (normalized.estimatedMinutes > input.requestedMinutes) {
     return trimWorkoutToMinutes(normalized, input.requestedMinutes, preferKeepTreading);
   }
@@ -401,6 +407,66 @@ function normalizeWorkout(workout: Record<string, unknown>, requestedMinutes: nu
   } satisfies GeneratedWorkout;
 }
 
+function shouldCapBeginnerDistances(profile: SwimmerProfile | null): boolean {
+  if (!profile) {
+    return false;
+  }
+
+  if (profile.level === "beginner") {
+    return true;
+  }
+
+  if (profile.fearOfDeepWater) {
+    return true;
+  }
+
+  return (profile.waterTreadingCapabilitySeconds ?? 0) < 30;
+}
+
+function clampDistanceString(distance: string, maxMeters: number): string {
+  const match = distance.match(/(\d+(?:\.\d+)?)/);
+  if (!match) {
+    return distance;
+  }
+
+  const value = Number(match[1]);
+  if (!Number.isFinite(value) || value <= maxMeters) {
+    return distance;
+  }
+
+  const index = match.index ?? 0;
+  const suffix = distance.slice(index + match[1].length);
+  return `${maxMeters}${suffix}`;
+}
+
+function applyBeginnerDistanceCap(workout: GeneratedWorkout, profile: SwimmerProfile | null): GeneratedWorkout {
+  if (!shouldCapBeginnerDistances(profile)) {
+    return workout;
+  }
+
+  const maxMeters = 25;
+  const capItem = (item: WorkoutCardItem): WorkoutCardItem => {
+    if (!item.distance) {
+      return item;
+    }
+    const capped = clampDistanceString(item.distance, maxMeters);
+    return capped === item.distance ? item : { ...item, distance: capped };
+  };
+
+  const sections = {
+    warm_up: workout.warm_up.map(capItem),
+    main_set: workout.main_set.map(capItem),
+    treading_drills: workout.treading_drills,
+    cool_down: workout.cool_down.map(capItem),
+  };
+
+  return {
+    ...workout,
+    ...sections,
+    estimatedMinutes: estimateTotalTimeMinutes(sections as unknown as Record<string, unknown>),
+  };
+}
+
 function summarizeBookingHistory(bookings: Booking[]) {
   const totalSessions = bookings.length;
   const attended = bookings.filter((item) => item.attendanceStatus === "present").length;
@@ -487,7 +553,8 @@ async function fetchWorkoutFromLlm(input: {
       try {
         const jsonPayload = extractJsonPayload(content);
         const parsed = parseJsonPayload(jsonPayload);
-        const normalized = normalizeWorkout(parsed, input.requestedMinutes);
+        let normalized = normalizeWorkout(parsed, input.requestedMinutes);
+        normalized = applyBeginnerDistanceCap(normalized, input.swimmerProfile);
 
         if (normalized.estimatedMinutes > maxMinutes) {
           lastEstimate = normalized.estimatedMinutes;
