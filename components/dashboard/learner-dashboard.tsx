@@ -447,7 +447,7 @@ export function LearnerDashboard() {
         <div className="mt-4 rounded-xl border border-teal-500/30 bg-black/60 p-4">
           <p className="text-xs uppercase tracking-[0.18em] text-teal-100/70">Swimmer Intake</p>
           <p className="mt-2 text-sm text-teal-50/75">
-            Type the details manually before generating the set. The AI will use what you enter here.
+            Type the details manually before generating the set. Coach Assist will use what you enter here.
           </p>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             <label className="space-y-2 text-sm text-teal-50">
@@ -535,7 +535,7 @@ export function LearnerDashboard() {
         <div className="mt-4 rounded-2xl border border-teal-500/25 bg-[linear-gradient(180deg,rgba(8,47,73,0.65),rgba(0,0,0,0.45))] p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-xs uppercase tracking-[0.24em] text-teal-300">AI Training Set</p>
+              <p className="text-xs uppercase tracking-[0.24em] text-teal-300">Coach Assist Training Set</p>
               <h2 className="mt-1 text-2xl">Generate Today&apos;s Set</h2>
               <p className="mt-2 max-w-2xl text-sm text-teal-50/75">
                 The generator will only run after you fill the swimmer intake fields above.

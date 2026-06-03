@@ -31,6 +31,7 @@ const COACH_SYSTEM_PROMPT = [
   "Generate a precise daily set tailored to the swimmer's level, confidence, training history, water treading ability, and current goals.",
   "For beginner or fearful swimmers, cap continuous distances at 25m and avoid 50m/100m continuous repeats; use short repeats with rest.",
   "Never assign 100m continuous swims for beginners; keep drills simple, low volume, and confidence-building.",
+  "For beginners, keep total distance conservative (roughly 12.5m per requested minute; never above 600m).",
   "Respect the requested session duration and keep the total session within the requested minutes and never above 60 minutes.",
   "Use conservative volume to ensure the set fits the requested time. Shorten the main set first if needed.",
   "Make the structure balanced and realistic for the time available.",
@@ -44,6 +45,7 @@ const COACH_SYSTEM_PROMPT = [
 ].join(" ");
 
 const OPENAI_TIMEOUT_MS = 25000;
+const BEGINNER_MAX_DISTANCE_PER_MIN = 12.5;
 
 function extractJsonPayload(text: string): string {
   const stripped = text.replace(/```json/gi, "").replace(/```/g, "").trim();
@@ -189,6 +191,7 @@ function trimWorkoutToMinutes(
   workout: GeneratedWorkout,
   targetMinutes: number,
   preferKeepTreading: boolean,
+  profile?: SwimmerProfile | null,
 ): GeneratedWorkout {
   const limit = Math.max(15, Math.min(60, targetMinutes));
   const sections = {
@@ -211,7 +214,7 @@ function trimWorkoutToMinutes(
     ? ["main_set", "warm_up", "cool_down", "treading_drills"]
     : ["main_set", "treading_drills", "warm_up", "cool_down"];
 
-  let estimated = estimateTotalTimeMinutes(sections as unknown as Record<string, unknown>);
+  let estimated = estimateTotalTimeMinutes(sections as unknown as Record<string, unknown>, profile);
   while (estimated > limit) {
     let removed = false;
     for (const section of trimOrder) {
@@ -224,7 +227,7 @@ function trimWorkoutToMinutes(
     if (!removed) {
       break;
     }
-    estimated = estimateTotalTimeMinutes(sections as unknown as Record<string, unknown>);
+    estimated = estimateTotalTimeMinutes(sections as unknown as Record<string, unknown>, profile);
   }
 
   return {
@@ -295,11 +298,10 @@ function buildFallbackWorkout(
     ],
   };
 
-  const normalized = applyBeginnerDistanceCap(normalizeWorkout(draft, input.requestedMinutes), input.swimmerProfile);
-  if (normalized.estimatedMinutes > input.requestedMinutes) {
-    return trimWorkoutToMinutes(normalized, input.requestedMinutes, preferKeepTreading);
-  }
-
+  let normalized = normalizeWorkout(draft, input.requestedMinutes, input.swimmerProfile);
+  normalized = applyBeginnerDistanceCap(normalized, input.swimmerProfile);
+  normalized = capBeginnerTotalDistance(normalized, input.swimmerProfile, input.requestedMinutes);
+  normalized = ensureWorkoutMatchesMinutes(normalized, input.requestedMinutes, preferKeepTreading, input.swimmerProfile);
   return normalized;
 }
 
@@ -361,8 +363,25 @@ function normalizeSwimmerProfile(input?: Partial<SwimmerProfile>): SwimmerProfil
   };
 }
 
-function estimateTotalTimeMinutes(workout: Record<string, unknown>) {
+function shouldUseBeginnerPace(profile: SwimmerProfile | null): boolean {
+  if (!profile) {
+    return false;
+  }
+
+  if (profile.level === "beginner") {
+    return true;
+  }
+
+  if (profile.fearOfDeepWater) {
+    return true;
+  }
+
+  return (profile.waterTreadingCapabilitySeconds ?? 0) < 30;
+}
+
+function estimateTotalTimeMinutes(workout: Record<string, unknown>, profile?: SwimmerProfile | null) {
   const sections = ["warm_up", "main_set", "treading_drills", "cool_down"] as const;
+  const minutesPer25 = shouldUseBeginnerPace(profile ?? null) ? 2 : 1;
   const rawTotal = sections.reduce((sum, section) => {
     const items = Array.isArray(workout[section]) ? workout[section] : [];
 
@@ -378,7 +397,9 @@ function estimateTotalTimeMinutes(workout: Record<string, unknown>) {
         const reps = typeof item === "object" && item !== null ? Number((item as { reps?: unknown }).reps ?? 0) : 0;
         const distance = typeof item === "object" && item !== null ? String((item as { distance?: unknown }).distance ?? "") : "";
         const distanceValue = Number.parseFloat(distance);
-        const distanceMinutes = Number.isFinite(distanceValue) ? Math.max(1, Math.round(distanceValue / 25)) : 1;
+        const distanceMinutes = Number.isFinite(distanceValue)
+          ? Math.max(1, Math.round(distanceValue / 25)) * minutesPer25
+          : minutesPer25;
         return sectionSum + Math.max(1, reps) * distanceMinutes;
       }, 0)
     );
@@ -387,7 +408,7 @@ function estimateTotalTimeMinutes(workout: Record<string, unknown>) {
   return rawTotal;
 }
 
-function normalizeWorkout(workout: Record<string, unknown>, requestedMinutes: number) {
+function normalizeWorkout(workout: Record<string, unknown>, requestedMinutes: number, profile?: SwimmerProfile | null) {
   const sections = {
     warm_up: Array.isArray(workout.warm_up) ? workout.warm_up : [],
     main_set: Array.isArray(workout.main_set) ? workout.main_set : [],
@@ -403,7 +424,7 @@ function normalizeWorkout(workout: Record<string, unknown>, requestedMinutes: nu
     treading_drills: sections.treading_drills,
     cool_down: sections.cool_down,
     requestedMinutes,
-    estimatedMinutes: estimateTotalTimeMinutes(sections as unknown as Record<string, unknown>),
+    estimatedMinutes: estimateTotalTimeMinutes(sections as unknown as Record<string, unknown>, profile ?? null),
   } satisfies GeneratedWorkout;
 }
 
@@ -439,18 +460,143 @@ function clampDistanceString(distance: string, maxMeters: number): string {
   return `${maxMeters}${suffix}`;
 }
 
+function estimateTotalDistanceMeters(sections: Record<string, WorkoutCardItem[]>): number {
+  const distanceSections: Array<keyof typeof sections> = ["warm_up", "main_set", "cool_down"];
+  return distanceSections.reduce((sum, section) => {
+    return sum + sections[section].reduce((sectionSum, item) => {
+      const distance = typeof item.distance === "string" ? item.distance : "";
+      const distanceValue = Number.parseFloat(distance);
+      if (!Number.isFinite(distanceValue)) {
+        return sectionSum;
+      }
+      const reps = typeof item.reps === "number" ? Math.max(1, Math.round(item.reps)) : 1;
+      return sectionSum + distanceValue * reps;
+    }, 0);
+  }, 0);
+}
+
+function capBeginnerTotalDistance(
+  workout: GeneratedWorkout,
+  profile: SwimmerProfile | null,
+  requestedMinutes: number,
+): GeneratedWorkout {
+  if (!shouldCapBeginnerDistances(profile)) {
+    return workout;
+  }
+
+  const maxDistance = Math.min(600, Math.max(200, Math.round(requestedMinutes * BEGINNER_MAX_DISTANCE_PER_MIN)));
+  const sections = {
+    warm_up: workout.warm_up.map((item) => ({ ...item })),
+    main_set: workout.main_set.map((item) => ({ ...item })),
+    treading_drills: workout.treading_drills,
+    cool_down: workout.cool_down.map((item) => ({ ...item })),
+  };
+
+  let totalDistance = estimateTotalDistanceMeters(sections);
+  const reduceOrder: Array<keyof typeof sections> = ["main_set", "warm_up", "cool_down"];
+
+  while (totalDistance > maxDistance) {
+    let updated = false;
+    for (const section of reduceOrder) {
+      const items = sections[section];
+      for (let index = 0; index < items.length; index += 1) {
+        const reps = items[index].reps;
+        if (typeof reps === "number" && reps > 1) {
+          items[index] = { ...items[index], reps: reps - 1 };
+          updated = true;
+          break;
+        }
+      }
+      if (updated) {
+        break;
+      }
+    }
+    if (!updated) {
+      break;
+    }
+    totalDistance = estimateTotalDistanceMeters(sections);
+  }
+
+  return {
+    ...workout,
+    ...sections,
+    estimatedMinutes: estimateTotalTimeMinutes(sections as unknown as Record<string, unknown>, profile),
+  };
+}
+
+function padWorkoutToMinutes(
+  workout: GeneratedWorkout,
+  targetMinutes: number,
+  profile: SwimmerProfile | null,
+): GeneratedWorkout {
+  const limit = Math.max(15, Math.min(60, targetMinutes));
+  const sections = {
+    warm_up: [...workout.warm_up],
+    main_set: [...workout.main_set],
+    treading_drills: [...workout.treading_drills],
+    cool_down: [...workout.cool_down],
+  };
+
+  let estimated = estimateTotalTimeMinutes(sections as unknown as Record<string, unknown>, profile);
+  if (estimated >= limit - 1) {
+    return {
+      ...workout,
+      estimatedMinutes: estimated,
+    };
+  }
+
+  const isBeginner = shouldCapBeginnerDistances(profile);
+  const padDescription = isBeginner
+    ? "Wall hold and breathing reset"
+    : "Easy recovery, breathing focus";
+
+  while (estimated < limit - 1) {
+    const remaining = limit - estimated;
+    const minutes = remaining >= 2 ? 2 : 1;
+    sections.treading_drills.push({ description: padDescription, duration: `${minutes} minute${minutes > 1 ? "s" : ""}` });
+    estimated += minutes;
+  }
+
+  return {
+    ...workout,
+    ...sections,
+    estimatedMinutes: estimated,
+  };
+}
+
+function ensureWorkoutMatchesMinutes(
+  workout: GeneratedWorkout,
+  targetMinutes: number,
+  preferKeepTreading: boolean,
+  profile: SwimmerProfile | null,
+): GeneratedWorkout {
+  const limit = Math.max(15, Math.min(60, targetMinutes));
+  let adjusted = workout;
+
+  if (adjusted.estimatedMinutes > limit) {
+    adjusted = trimWorkoutToMinutes(adjusted, limit, preferKeepTreading, profile);
+  }
+
+  return padWorkoutToMinutes(adjusted, limit, profile);
+}
+
 function applyBeginnerDistanceCap(workout: GeneratedWorkout, profile: SwimmerProfile | null): GeneratedWorkout {
   if (!shouldCapBeginnerDistances(profile)) {
     return workout;
   }
 
   const maxMeters = 25;
+  const maxReps = 6;
   const capItem = (item: WorkoutCardItem): WorkoutCardItem => {
-    if (!item.distance) {
-      return item;
+    let nextItem = item;
+    if (typeof item.reps === "number" && item.reps > maxReps) {
+      nextItem = { ...nextItem, reps: maxReps };
     }
-    const capped = clampDistanceString(item.distance, maxMeters);
-    return capped === item.distance ? item : { ...item, distance: capped };
+    if (!nextItem.distance) {
+      return nextItem;
+    }
+    const capped = clampDistanceString(nextItem.distance, maxMeters);
+    return capped === nextItem.distance ? nextItem : { ...nextItem, distance: capped };
   };
 
   const sections = {
@@ -463,7 +609,7 @@ function applyBeginnerDistanceCap(workout: GeneratedWorkout, profile: SwimmerPro
   return {
     ...workout,
     ...sections,
-    estimatedMinutes: estimateTotalTimeMinutes(sections as unknown as Record<string, unknown>),
+    estimatedMinutes: estimateTotalTimeMinutes(sections as unknown as Record<string, unknown>, profile),
   };
 }
 
@@ -553,8 +699,9 @@ async function fetchWorkoutFromLlm(input: {
       try {
         const jsonPayload = extractJsonPayload(content);
         const parsed = parseJsonPayload(jsonPayload);
-        let normalized = normalizeWorkout(parsed, input.requestedMinutes);
+        let normalized = normalizeWorkout(parsed, input.requestedMinutes, input.swimmerProfile);
         normalized = applyBeginnerDistanceCap(normalized, input.swimmerProfile);
+        normalized = capBeginnerTotalDistance(normalized, input.swimmerProfile, input.requestedMinutes);
 
         if (normalized.estimatedMinutes > maxMinutes) {
           lastEstimate = normalized.estimatedMinutes;
@@ -562,10 +709,10 @@ async function fetchWorkoutFromLlm(input: {
             continue;
           }
 
-          return trimWorkoutToMinutes(normalized, maxMinutes, preferKeepTreading);
+          return trimWorkoutToMinutes(normalized, maxMinutes, preferKeepTreading, input.swimmerProfile);
         }
 
-        return normalized;
+        return ensureWorkoutMatchesMinutes(normalized, maxMinutes, preferKeepTreading, input.swimmerProfile);
       } catch (err) {
         console.error(err);
         console.error("LLM raw response length:", content.length);
