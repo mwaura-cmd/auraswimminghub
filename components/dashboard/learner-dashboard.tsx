@@ -474,94 +474,110 @@ export function LearnerDashboard() {
           <p className="mt-4 rounded-xl border border-rose-500/40 bg-rose-900/20 p-3 text-sm text-rose-200">{profileError}</p>
         )}
 
-        <div className="mt-4 rounded-xl border border-teal-500/30 bg-black/60 p-4">
-          <p className="text-xs uppercase tracking-[0.18em] text-teal-100/70">Swimmer Intake</p>
-          <p className="mt-2 text-sm text-teal-50/75">
-            Type the details manually before generating the set. Coach Assist will use what you enter here.
-          </p>
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <label className="space-y-2 text-sm text-teal-50">
-              <span className="block text-teal-100/70">Swimming Level</span>
-              <select
-                value={manualLevel}
-                onChange={(event) => setManualLevel(event.target.value as SwimLevel | "")}
-                className="w-full rounded-xl border border-teal-500/30 bg-black/70 px-3 py-3 text-teal-50 outline-none transition focus:border-teal-300"
-              >
-                <option value="">Select level</option>
-                <option value="beginner">Beginner</option>
-                <option value="intermediate">Intermediate</option>
-                <option value="advanced">Advanced</option>
-                <option value="competitive">Competitive</option>
-              </select>
-              <p className="text-xs text-teal-100/55">If you are unsure, choose beginner and we’ll keep it gentle.</p>
-            </label>
-            <label className="space-y-2 text-sm text-teal-50">
-              <span className="block text-teal-100/70">Water Treading Capability (seconds)</span>
-              <input
-                type="number"
-                min={0}
-                placeholder="e.g. 30"
-                value={manualWaterTreadingSeconds}
-                onChange={(event) => setManualWaterTreadingSeconds(event.target.value)}
-                className="w-full rounded-xl border border-teal-500/30 bg-black/70 px-3 py-3 text-teal-50 outline-none transition placeholder:text-teal-100/35 focus:border-teal-300"
-              />
-              <p className="text-xs text-teal-100/55">Shorter times mean we lean into calm breathing, balance, and support drills.</p>
-            </label>
-            <label className="space-y-2 text-sm text-teal-50">
-              <span className="block text-teal-100/70">Deep Water Confidence</span>
-              <select
-                value={manualDeepWaterConfidence}
-                onChange={(event) => setManualDeepWaterConfidence(event.target.value as "" | "true" | "false")}
-                className="w-full rounded-xl border border-teal-500/30 bg-black/70 px-3 py-3 text-teal-50 outline-none transition focus:border-teal-300"
-              >
-                <option value="">Select confidence</option>
-                <option value="false">Confident</option>
-                <option value="true">Needs support</option>
-              </select>
-            </label>
-            <label className="space-y-2 text-sm text-teal-50">
-              <span className="block text-teal-100/70">Session Time Limit (minutes)</span>
-              <input
-                type="number"
-                min={15}
-                max={60}
-                placeholder="e.g. 40"
-                value={manualSessionMinutes}
-                onChange={(event) => setManualSessionMinutes(event.target.value)}
-                className="w-full rounded-xl border border-teal-500/30 bg-black/70 px-3 py-3 text-teal-50 outline-none transition placeholder:text-teal-100/35 focus:border-teal-300"
-              />
-              <p className="text-xs text-teal-100/55">We keep the session close to your time limit, not above it.</p>
-            </label>
-            <label className="space-y-2 text-sm text-teal-50 md:col-span-2">
-              <span className="block text-teal-100/70">Fitness Goals</span>
-              <input
-                type="text"
-                placeholder="e.g. build-water-confidence, improve-freestyle"
-                value={manualFitnessGoals}
-                onChange={(event) => setManualFitnessGoals(event.target.value)}
-                className="w-full rounded-xl border border-teal-500/30 bg-black/70 px-3 py-3 text-teal-50 outline-none transition placeholder:text-teal-100/35 focus:border-teal-300"
-              />
-            </label>
-            <label className="space-y-2 text-sm text-teal-50 md:col-span-2">
-              <span className="block text-teal-100/70">Preferred Strokes</span>
-              <input
-                type="text"
-                placeholder="e.g. freestyle, backstroke"
-                value={manualPreferredStrokes}
-                onChange={(event) => setManualPreferredStrokes(event.target.value)}
-                className="w-full rounded-xl border border-teal-500/30 bg-black/70 px-3 py-3 text-teal-50 outline-none transition placeholder:text-teal-100/35 focus:border-teal-300"
-              />
-            </label>
-            <label className="space-y-2 text-sm text-teal-50 md:col-span-2">
-              <span className="block text-teal-100/70">Coach Notes</span>
-              <textarea
-                rows={3}
-                placeholder="Anything the coach should know before generating the set"
-                value={manualNotes}
-                onChange={(event) => setManualNotes(event.target.value)}
-                className="w-full rounded-xl border border-teal-500/30 bg-black/70 px-3 py-3 text-teal-50 outline-none transition placeholder:text-teal-100/35 focus:border-teal-300"
-              />
-            </label>
+        <div className="relative mt-4 overflow-hidden rounded-2xl border border-teal-500/30 bg-black/60 p-5 md:p-6">
+          <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-teal-500/10 blur-[80px]" />
+          
+          <div className="relative">
+            <div className="mb-6">
+              <div className="flex items-center gap-2">
+                <div className="hidden h-8 w-1 rounded-full bg-teal-500 md:block" />
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-teal-300">Swimmer Intake</p>
+              </div>
+              <p className="mt-2 text-sm text-teal-50/75">
+                Type the details manually before generating the set. Coach Assist will use what you enter here.
+              </p>
+            </div>
+            
+            <div className="grid gap-5 md:grid-cols-2">
+              <label className="group space-y-2 text-sm text-teal-50">
+                <span className="block font-medium text-teal-100/90 transition-colors group-focus-within:text-teal-300">Swimming Level</span>
+                <select
+                  value={manualLevel}
+                  onChange={(event) => setManualLevel(event.target.value as SwimLevel | "")}
+                  className="w-full appearance-none rounded-xl border border-teal-500/20 bg-teal-950/20 px-4 py-3 text-teal-50 outline-none backdrop-blur-sm transition hover:bg-teal-950/40 focus:border-teal-400 focus:bg-teal-950/40 focus:ring-4 focus:ring-teal-500/10"
+                >
+                  <option value="" className="bg-slate-900">Select level</option>
+                  <option value="beginner" className="bg-slate-900">Beginner</option>
+                  <option value="intermediate" className="bg-slate-900">Intermediate</option>
+                  <option value="advanced" className="bg-slate-900">Advanced</option>
+                  <option value="competitive" className="bg-slate-900">Competitive</option>
+                </select>
+                <p className="text-xs text-teal-100/55">If you are unsure, choose beginner and we’ll keep it gentle.</p>
+              </label>
+              
+              <label className="group space-y-2 text-sm text-teal-50">
+                <span className="block font-medium text-teal-100/90 transition-colors group-focus-within:text-teal-300">Water Treading Capability (seconds)</span>
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="e.g. 30"
+                  value={manualWaterTreadingSeconds}
+                  onChange={(event) => setManualWaterTreadingSeconds(event.target.value)}
+                  className="w-full rounded-xl border border-teal-500/20 bg-teal-950/20 px-4 py-3 text-teal-50 outline-none backdrop-blur-sm transition placeholder:text-teal-100/35 hover:bg-teal-950/40 focus:border-teal-400 focus:bg-teal-950/40 focus:ring-4 focus:ring-teal-500/10"
+                />
+                <p className="text-xs text-teal-100/55">Shorter times mean we lean into calm breathing, balance, and support drills.</p>
+              </label>
+              
+              <label className="group space-y-2 text-sm text-teal-50">
+                <span className="block font-medium text-teal-100/90 transition-colors group-focus-within:text-teal-300">Deep Water Confidence</span>
+                <select
+                  value={manualDeepWaterConfidence}
+                  onChange={(event) => setManualDeepWaterConfidence(event.target.value as "" | "true" | "false")}
+                  className="w-full appearance-none rounded-xl border border-teal-500/20 bg-teal-950/20 px-4 py-3 text-teal-50 outline-none backdrop-blur-sm transition hover:bg-teal-950/40 focus:border-teal-400 focus:bg-teal-950/40 focus:ring-4 focus:ring-teal-500/10"
+                >
+                  <option value="" className="bg-slate-900">Select confidence</option>
+                  <option value="false" className="bg-slate-900">Confident</option>
+                  <option value="true" className="bg-slate-900">Needs support</option>
+                </select>
+              </label>
+              
+              <label className="group space-y-2 text-sm text-teal-50">
+                <span className="block font-medium text-teal-100/90 transition-colors group-focus-within:text-teal-300">Session Time Limit (minutes)</span>
+                <input
+                  type="number"
+                  min={15}
+                  max={60}
+                  placeholder="e.g. 40"
+                  value={manualSessionMinutes}
+                  onChange={(event) => setManualSessionMinutes(event.target.value)}
+                  className="w-full rounded-xl border border-teal-500/20 bg-teal-950/20 px-4 py-3 text-teal-50 outline-none backdrop-blur-sm transition placeholder:text-teal-100/35 hover:bg-teal-950/40 focus:border-teal-400 focus:bg-teal-950/40 focus:ring-4 focus:ring-teal-500/10"
+                />
+                <p className="text-xs text-teal-100/55">We keep the session close to your time limit, not above it.</p>
+              </label>
+              
+              <label className="group space-y-2 text-sm text-teal-50 md:col-span-2">
+                <span className="block font-medium text-teal-100/90 transition-colors group-focus-within:text-teal-300">Fitness Goals</span>
+                <input
+                  type="text"
+                  placeholder="e.g. build-water-confidence, improve-freestyle"
+                  value={manualFitnessGoals}
+                  onChange={(event) => setManualFitnessGoals(event.target.value)}
+                  className="w-full rounded-xl border border-teal-500/20 bg-teal-950/20 px-4 py-3 text-teal-50 outline-none backdrop-blur-sm transition placeholder:text-teal-100/35 hover:bg-teal-950/40 focus:border-teal-400 focus:bg-teal-950/40 focus:ring-4 focus:ring-teal-500/10"
+                />
+              </label>
+              
+              <label className="group space-y-2 text-sm text-teal-50 md:col-span-2">
+                <span className="block font-medium text-teal-100/90 transition-colors group-focus-within:text-teal-300">Preferred Strokes</span>
+                <input
+                  type="text"
+                  placeholder="e.g. freestyle, backstroke"
+                  value={manualPreferredStrokes}
+                  onChange={(event) => setManualPreferredStrokes(event.target.value)}
+                  className="w-full rounded-xl border border-teal-500/20 bg-teal-950/20 px-4 py-3 text-teal-50 outline-none backdrop-blur-sm transition placeholder:text-teal-100/35 hover:bg-teal-950/40 focus:border-teal-400 focus:bg-teal-950/40 focus:ring-4 focus:ring-teal-500/10"
+                />
+              </label>
+              
+              <label className="group space-y-2 text-sm text-teal-50 md:col-span-2">
+                <span className="block font-medium text-teal-100/90 transition-colors group-focus-within:text-teal-300">Coach Notes</span>
+                <textarea
+                  rows={3}
+                  placeholder="Anything the coach should know before generating the set"
+                  value={manualNotes}
+                  onChange={(event) => setManualNotes(event.target.value)}
+                  className="w-full resize-none rounded-xl border border-teal-500/20 bg-teal-950/20 px-4 py-3 text-teal-50 outline-none backdrop-blur-sm transition placeholder:text-teal-100/35 hover:bg-teal-950/40 focus:border-teal-400 focus:bg-teal-950/40 focus:ring-4 focus:ring-teal-500/10"
+                />
+              </label>
+            </div>
           </div>
         </div>
 
