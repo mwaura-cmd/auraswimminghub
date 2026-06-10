@@ -199,6 +199,36 @@ export function LearnerDashboard() {
     return Math.round((attendedSessionsCount / markedSessionsCount) * 100);
   }, [attendedSessionsCount, markedSessionsCount]);
 
+  const onboardingBanter = useMemo(() => {
+    const treadingSeconds = Number(manualWaterTreadingSeconds);
+    const isBeginnerFriendly =
+      manualLevel === "beginner" ||
+      manualDeepWaterConfidence === "true" ||
+      (Number.isFinite(treadingSeconds) && treadingSeconds > 0 && treadingSeconds < 30);
+
+    if (!manualLevel && !manualFitnessGoals && !manualPreferredStrokes) {
+      return [
+        "Pick a level and we’ll keep the set realistic, calm, and properly paced.",
+        "We keep beginner sessions short, confidence-building, and lane-friendly.",
+        "Tell us your vibe, and Coach Assist will tune the set to match it.",
+      ];
+    }
+
+    if (isBeginnerFriendly) {
+      return [
+        "Small wins count: clean water, easy breathing, and one good length at a time.",
+        "Float first, flex later. Smooth strokes beat rushed strokes every time.",
+        "Kickboard confidence, relaxed turns, and simple reps are the move today.",
+      ];
+    }
+
+    return [
+      "We’ll keep the set structured, time-matched, and aligned to your current pace.",
+      "Add your goals and Coach Assist will shape the work around them.",
+      "If you want more challenge, the session can ramp without losing form.",
+    ];
+  }, [manualDeepWaterConfidence, manualFitnessGoals, manualLevel, manualPreferredStrokes, manualWaterTreadingSeconds]);
+
   const nextSessionCountdown = useMemo(() => {
     const nextSessionDate = nextSession ? getSessionDate(nextSession) : null;
     if (!nextSessionDate) {
@@ -463,6 +493,7 @@ export function LearnerDashboard() {
                 <option value="advanced">Advanced</option>
                 <option value="competitive">Competitive</option>
               </select>
+              <p className="text-xs text-teal-100/55">If you are unsure, choose beginner and we’ll keep it gentle.</p>
             </label>
             <label className="space-y-2 text-sm text-teal-50">
               <span className="block text-teal-100/70">Water Treading Capability (seconds)</span>
@@ -474,6 +505,7 @@ export function LearnerDashboard() {
                 onChange={(event) => setManualWaterTreadingSeconds(event.target.value)}
                 className="w-full rounded-xl border border-teal-500/30 bg-black/70 px-3 py-3 text-teal-50 outline-none transition placeholder:text-teal-100/35 focus:border-teal-300"
               />
+              <p className="text-xs text-teal-100/55">Shorter times mean we lean into calm breathing, balance, and support drills.</p>
             </label>
             <label className="space-y-2 text-sm text-teal-50">
               <span className="block text-teal-100/70">Deep Water Confidence</span>
@@ -498,6 +530,7 @@ export function LearnerDashboard() {
                 onChange={(event) => setManualSessionMinutes(event.target.value)}
                 className="w-full rounded-xl border border-teal-500/30 bg-black/70 px-3 py-3 text-teal-50 outline-none transition placeholder:text-teal-100/35 focus:border-teal-300"
               />
+              <p className="text-xs text-teal-100/55">We keep the session close to your time limit, not above it.</p>
             </label>
             <label className="space-y-2 text-sm text-teal-50 md:col-span-2">
               <span className="block text-teal-100/70">Fitness Goals</span>
@@ -559,6 +592,25 @@ export function LearnerDashboard() {
               {workoutBusy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
               {workoutBusy ? "Generating..." : "Generate Set"}
             </button>
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-teal-500/20 bg-black/25 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-xs uppercase tracking-[0.22em] text-teal-300">Pool Banter</p>
+                <h3 className="mt-1 text-lg text-teal-50">Friendly cues for the lane</h3>
+              </div>
+              <span className="rounded-full border border-teal-500/30 bg-teal-500/10 px-3 py-1 text-xs text-teal-50">
+                {manualLevel || "General"}
+              </span>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              {onboardingBanter.map((line) => (
+                <div key={line} className="rounded-2xl border border-teal-500/15 bg-white/5 px-4 py-3 text-sm text-teal-50/85">
+                  {line}
+                </div>
+              ))}
+            </div>
           </div>
 
           {workoutError && (
