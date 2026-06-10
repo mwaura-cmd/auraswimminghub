@@ -483,9 +483,6 @@ export function LearnerDashboard() {
                 <div className="hidden h-8 w-1 rounded-full bg-teal-500 md:block" />
                 <p className="text-sm font-semibold uppercase tracking-[0.18em] text-teal-300">Swimmer Intake</p>
               </div>
-              <p className="mt-2 text-sm text-teal-50/75">
-                Type the details manually before generating the set. Coach Assist will use what you enter here.
-              </p>
             </div>
             
             <div className="grid gap-5 md:grid-cols-2">
@@ -502,7 +499,6 @@ export function LearnerDashboard() {
                   <option value="advanced" className="bg-slate-900">Advanced</option>
                   <option value="competitive" className="bg-slate-900">Competitive</option>
                 </select>
-                <p className="text-xs text-teal-100/55">If you are unsure, choose beginner and we’ll keep it gentle.</p>
               </label>
               
               <label className="group space-y-2 text-sm text-teal-50">
@@ -515,7 +511,6 @@ export function LearnerDashboard() {
                   onChange={(event) => setManualWaterTreadingSeconds(event.target.value)}
                   className="w-full rounded-xl border border-teal-500/20 bg-teal-950/20 px-4 py-3 text-teal-50 outline-none backdrop-blur-sm transition placeholder:text-teal-100/35 hover:bg-teal-950/40 focus:border-teal-400 focus:bg-teal-950/40 focus:ring-4 focus:ring-teal-500/10"
                 />
-                <p className="text-xs text-teal-100/55">Shorter times mean we lean into calm breathing, balance, and support drills.</p>
               </label>
               
               <label className="group space-y-2 text-sm text-teal-50">
@@ -542,7 +537,6 @@ export function LearnerDashboard() {
                   onChange={(event) => setManualSessionMinutes(event.target.value)}
                   className="w-full rounded-xl border border-teal-500/20 bg-teal-950/20 px-4 py-3 text-teal-50 outline-none backdrop-blur-sm transition placeholder:text-teal-100/35 hover:bg-teal-950/40 focus:border-teal-400 focus:bg-teal-950/40 focus:ring-4 focus:ring-teal-500/10"
                 />
-                <p className="text-xs text-teal-100/55">We keep the session close to your time limit, not above it.</p>
               </label>
               
               <label className="group space-y-2 text-sm text-teal-50 md:col-span-2">
@@ -586,15 +580,11 @@ export function LearnerDashboard() {
             <div>
               <p className="text-xs uppercase tracking-[0.24em] text-teal-300">Coach Assist Training Set</p>
               <h2 className="mt-1 text-2xl">Generate Today&apos;s Set</h2>
-              <p className="mt-2 max-w-2xl text-sm text-teal-50/75">
-                The generator will only run after you fill the swimmer intake fields above.
-              </p>
             </div>
           </div>
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-teal-500/20 bg-black/30 p-4">
             <div>
               <p className="text-xs uppercase tracking-[0.22em] text-teal-300">Session Length</p>
-              <p className="mt-1 text-sm text-teal-50/75">The session length comes from the intake form.</p>
             </div>
             <div className="rounded-full border border-teal-500/30 bg-teal-500/10 px-4 py-2 text-sm text-teal-50">
               {manualSwimmerProfile ? `${manualSwimmerProfile.sessionTimeLimitMinutes} min ready` : "Fill intake fields first"}
