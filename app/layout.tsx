@@ -7,6 +7,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { AuthProvider } from "@/components/providers/auth-provider";
 import { ScrollReveal } from "@/components/scroll-reveal";
 import { ScrollToTop } from "@/components/scroll-to-top";
+import { Preloader } from "@/components/preloader";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -48,6 +49,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} h-full antialiased`}>
       <body className="min-h-full aura-bg text-aura-text">
+        <Preloader />
         <Script
           id="firebase-config"
           strategy="beforeInteractive"
