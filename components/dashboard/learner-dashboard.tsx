@@ -497,7 +497,7 @@ export function LearnerDashboard() {
                     <Sparkles className="h-5 w-5" />
                   </div>
                   <div className="flex-1 space-y-3 pt-1.5">
-                    <p className="text-sm font-medium text-teal-50">Welcome to Coach Assist! 🌊 Let's get your training tailored. What's your current swimming level?</p>
+                    <p className="text-sm font-medium text-teal-50">Welcome to Coach Assist! 🌊 Let&apos;s get your training tailored. What&apos;s your current swimming level?</p>
                     <div className="flex flex-wrap gap-2">
                       {(["beginner", "intermediate", "advanced", "competitive"] as SwimLevel[]).map((level) => (
                         <button
@@ -523,7 +523,7 @@ export function LearnerDashboard() {
                     </div>
                     <div className="flex-1 space-y-3 pt-1.5">
                       <p className="text-sm font-medium text-teal-50">
-                        {manualLevel === "beginner" ? "Every pro was once a beginner! To keep you safe, how long can you confidently tread water in seconds?" : "Great! Let's check your endurance. How many seconds can you comfortably tread water?"}
+                        {manualLevel === "beginner" ? "Every pro was once a beginner! To keep you safe, how long can you confidently tread water in seconds?" : "Great! Let&apos;s check your endurance. How many seconds can you comfortably tread water?"}
                       </p>
                       <input
                         type="number"
@@ -553,7 +553,7 @@ export function LearnerDashboard() {
                           onClick={() => setManualDeepWaterConfidence("false")}
                           className={`rounded-full border px-4 py-2 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-teal-500/50 ${manualDeepWaterConfidence === "false" ? "border-teal-400 bg-teal-500/20 text-teal-50" : "border-teal-500/20 bg-teal-950/20 text-teal-100/70 hover:border-teal-500/50 hover:bg-teal-950/40"}`}
                         >
-                          I'm completely confident
+                          I&apos;m completely confident
                         </button>
                         <button
                           onClick={() => setManualDeepWaterConfidence("true")}
@@ -576,7 +576,7 @@ export function LearnerDashboard() {
                       <Sparkles className="h-5 w-5" />
                     </div>
                     <div className="flex-1 space-y-3 pt-1.5">
-                      <p className="text-sm font-medium text-teal-50">Got it! How much time do you have for today's session (in minutes)?</p>
+                      <p className="text-sm font-medium text-teal-50">Got it! How much time do you have for today&apos;s session (in minutes)?</p>
                       <input
                         type="number"
                         min={15}
