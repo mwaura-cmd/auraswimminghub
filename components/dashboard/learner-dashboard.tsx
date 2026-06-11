@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Check, LoaderCircle, Trophy, CalendarDays, ReceiptText, Clock3, Sparkles } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
+import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/components/providers/auth-provider";
 import { formatSessionDate, formatSessionTime, getSessionDate, isUpcomingBooking } from "@/lib/booking-utils";
 import { BILLING_CYCLES, BILLING_CYCLE_LABEL, formatKes } from "@/lib/pricing";
@@ -481,96 +482,152 @@ export function LearnerDashboard() {
             <div className="mb-6">
               <div className="flex items-center gap-2">
                 <div className="hidden h-8 w-1 rounded-full bg-teal-500 md:block" />
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-teal-300">Swimmer Intake</p>
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-teal-300">Swimmer Onboarding</p>
               </div>
             </div>
             
-            <div className="grid gap-5 md:grid-cols-2">
-              <label className="group space-y-2 text-sm text-teal-50">
-                <span className="block font-medium text-teal-100/90 transition-colors group-focus-within:text-teal-300">Swimming Level</span>
-                <select
-                  value={manualLevel}
-                  onChange={(event) => setManualLevel(event.target.value as SwimLevel | "")}
-                  className="w-full appearance-none rounded-xl border border-teal-500/20 bg-teal-950/20 px-4 py-3 text-teal-50 outline-none backdrop-blur-sm transition hover:bg-teal-950/40 focus:border-teal-400 focus:bg-teal-950/40 focus:ring-4 focus:ring-teal-500/10"
+            <div className="mx-auto max-w-2xl space-y-6">
+              <AnimatePresence initial={false}>
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex gap-4"
                 >
-                  <option value="" className="bg-slate-900">Select level</option>
-                  <option value="beginner" className="bg-slate-900">Beginner</option>
-                  <option value="intermediate" className="bg-slate-900">Intermediate</option>
-                  <option value="advanced" className="bg-slate-900">Advanced</option>
-                  <option value="competitive" className="bg-slate-900">Competitive</option>
-                </select>
-              </label>
-              
-              <label className="group space-y-2 text-sm text-teal-50">
-                <span className="block font-medium text-teal-100/90 transition-colors group-focus-within:text-teal-300">Water Treading Capability (seconds)</span>
-                <input
-                  type="number"
-                  min={0}
-                  placeholder="e.g. 30"
-                  value={manualWaterTreadingSeconds}
-                  onChange={(event) => setManualWaterTreadingSeconds(event.target.value)}
-                  className="w-full rounded-xl border border-teal-500/20 bg-teal-950/20 px-4 py-3 text-teal-50 outline-none backdrop-blur-sm transition placeholder:text-teal-100/35 hover:bg-teal-950/40 focus:border-teal-400 focus:bg-teal-950/40 focus:ring-4 focus:ring-teal-500/10"
-                />
-              </label>
-              
-              <label className="group space-y-2 text-sm text-teal-50">
-                <span className="block font-medium text-teal-100/90 transition-colors group-focus-within:text-teal-300">Deep Water Confidence</span>
-                <select
-                  value={manualDeepWaterConfidence}
-                  onChange={(event) => setManualDeepWaterConfidence(event.target.value as "" | "true" | "false")}
-                  className="w-full appearance-none rounded-xl border border-teal-500/20 bg-teal-950/20 px-4 py-3 text-teal-50 outline-none backdrop-blur-sm transition hover:bg-teal-950/40 focus:border-teal-400 focus:bg-teal-950/40 focus:ring-4 focus:ring-teal-500/10"
-                >
-                  <option value="" className="bg-slate-900">Select confidence</option>
-                  <option value="false" className="bg-slate-900">Confident</option>
-                  <option value="true" className="bg-slate-900">Needs support</option>
-                </select>
-              </label>
-              
-              <label className="group space-y-2 text-sm text-teal-50">
-                <span className="block font-medium text-teal-100/90 transition-colors group-focus-within:text-teal-300">Session Time Limit (minutes)</span>
-                <input
-                  type="number"
-                  min={15}
-                  max={60}
-                  placeholder="e.g. 40"
-                  value={manualSessionMinutes}
-                  onChange={(event) => setManualSessionMinutes(event.target.value)}
-                  className="w-full rounded-xl border border-teal-500/20 bg-teal-950/20 px-4 py-3 text-teal-50 outline-none backdrop-blur-sm transition placeholder:text-teal-100/35 hover:bg-teal-950/40 focus:border-teal-400 focus:bg-teal-950/40 focus:ring-4 focus:ring-teal-500/10"
-                />
-              </label>
-              
-              <label className="group space-y-2 text-sm text-teal-50 md:col-span-2">
-                <span className="block font-medium text-teal-100/90 transition-colors group-focus-within:text-teal-300">Fitness Goals</span>
-                <input
-                  type="text"
-                  placeholder="e.g. build-water-confidence, improve-freestyle"
-                  value={manualFitnessGoals}
-                  onChange={(event) => setManualFitnessGoals(event.target.value)}
-                  className="w-full rounded-xl border border-teal-500/20 bg-teal-950/20 px-4 py-3 text-teal-50 outline-none backdrop-blur-sm transition placeholder:text-teal-100/35 hover:bg-teal-950/40 focus:border-teal-400 focus:bg-teal-950/40 focus:ring-4 focus:ring-teal-500/10"
-                />
-              </label>
-              
-              <label className="group space-y-2 text-sm text-teal-50 md:col-span-2">
-                <span className="block font-medium text-teal-100/90 transition-colors group-focus-within:text-teal-300">Preferred Strokes</span>
-                <input
-                  type="text"
-                  placeholder="e.g. freestyle, backstroke"
-                  value={manualPreferredStrokes}
-                  onChange={(event) => setManualPreferredStrokes(event.target.value)}
-                  className="w-full rounded-xl border border-teal-500/20 bg-teal-950/20 px-4 py-3 text-teal-50 outline-none backdrop-blur-sm transition placeholder:text-teal-100/35 hover:bg-teal-950/40 focus:border-teal-400 focus:bg-teal-950/40 focus:ring-4 focus:ring-teal-500/10"
-                />
-              </label>
-              
-              <label className="group space-y-2 text-sm text-teal-50 md:col-span-2">
-                <span className="block font-medium text-teal-100/90 transition-colors group-focus-within:text-teal-300">Coach Notes</span>
-                <textarea
-                  rows={3}
-                  placeholder="Anything the coach should know before generating the set"
-                  value={manualNotes}
-                  onChange={(event) => setManualNotes(event.target.value)}
-                  className="w-full resize-none rounded-xl border border-teal-500/20 bg-teal-950/20 px-4 py-3 text-teal-50 outline-none backdrop-blur-sm transition placeholder:text-teal-100/35 hover:bg-teal-950/40 focus:border-teal-400 focus:bg-teal-950/40 focus:ring-4 focus:ring-teal-500/10"
-                />
-              </label>
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-teal-500/20 text-teal-300">
+                    <Sparkles className="h-5 w-5" />
+                  </div>
+                  <div className="flex-1 space-y-3 pt-1.5">
+                    <p className="text-sm font-medium text-teal-50">Welcome to Coach Assist! 🌊 Let's get your training tailored. What's your current swimming level?</p>
+                    <div className="flex flex-wrap gap-2">
+                      {(["beginner", "intermediate", "advanced", "competitive"] as SwimLevel[]).map((level) => (
+                        <button
+                          key={level}
+                          onClick={() => setManualLevel(level)}
+                          className={`rounded-full border px-4 py-2 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-teal-500/50 ${manualLevel === level ? "border-teal-400 bg-teal-500/20 text-teal-50" : "border-teal-500/20 bg-teal-950/20 text-teal-100/70 hover:border-teal-500/50 hover:bg-teal-950/40 hover:text-teal-50"}`}
+                        >
+                          {level.charAt(0).toUpperCase() + level.slice(1)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </motion.div>
+
+                {manualLevel && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex gap-4"
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-teal-500/20 text-teal-300">
+                      <Sparkles className="h-5 w-5" />
+                    </div>
+                    <div className="flex-1 space-y-3 pt-1.5">
+                      <p className="text-sm font-medium text-teal-50">
+                        {manualLevel === "beginner" ? "Every pro was once a beginner! To keep you safe, how long can you confidently tread water in seconds?" : "Great! Let's check your endurance. How many seconds can you comfortably tread water?"}
+                      </p>
+                      <input
+                        type="number"
+                        min={0}
+                        placeholder="e.g. 30"
+                        value={manualWaterTreadingSeconds}
+                        onChange={(event) => setManualWaterTreadingSeconds(event.target.value)}
+                        className="w-full max-w-xs rounded-xl border border-teal-500/20 bg-teal-950/20 px-4 py-3 text-teal-50 outline-none backdrop-blur-sm transition placeholder:text-teal-100/35 hover:bg-teal-950/40 focus:border-teal-400 focus:bg-teal-950/40 focus:ring-4 focus:ring-teal-500/10"
+                      />
+                    </div>
+                  </motion.div>
+                )}
+
+                {manualLevel && manualWaterTreadingSeconds && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex gap-4"
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-teal-500/20 text-teal-300">
+                      <Sparkles className="h-5 w-5" />
+                    </div>
+                    <div className="flex-1 space-y-3 pt-1.5">
+                      <p className="text-sm font-medium text-teal-50">How do you feel about deep water?</p>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => setManualDeepWaterConfidence("false")}
+                          className={`rounded-full border px-4 py-2 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-teal-500/50 ${manualDeepWaterConfidence === "false" ? "border-teal-400 bg-teal-500/20 text-teal-50" : "border-teal-500/20 bg-teal-950/20 text-teal-100/70 hover:border-teal-500/50 hover:bg-teal-950/40"}`}
+                        >
+                          I'm completely confident
+                        </button>
+                        <button
+                          onClick={() => setManualDeepWaterConfidence("true")}
+                          className={`rounded-full border px-4 py-2 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-teal-500/50 ${manualDeepWaterConfidence === "true" ? "border-teal-400 bg-teal-500/20 text-teal-50" : "border-teal-500/20 bg-teal-950/20 text-teal-100/70 hover:border-teal-500/50 hover:bg-teal-950/40"}`}
+                        >
+                          I need some support
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                {manualLevel && manualWaterTreadingSeconds && manualDeepWaterConfidence && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex gap-4"
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-teal-500/20 text-teal-300">
+                      <Sparkles className="h-5 w-5" />
+                    </div>
+                    <div className="flex-1 space-y-3 pt-1.5">
+                      <p className="text-sm font-medium text-teal-50">Got it! How much time do you have for today's session (in minutes)?</p>
+                      <input
+                        type="number"
+                        min={15}
+                        max={60}
+                        placeholder="e.g. 40"
+                        value={manualSessionMinutes}
+                        onChange={(event) => setManualSessionMinutes(event.target.value)}
+                        className="w-full max-w-xs rounded-xl border border-teal-500/20 bg-teal-950/20 px-4 py-3 text-teal-50 outline-none backdrop-blur-sm transition placeholder:text-teal-100/35 hover:bg-teal-950/40 focus:border-teal-400 focus:bg-teal-950/40 focus:ring-4 focus:ring-teal-500/10"
+                      />
+                    </div>
+                  </motion.div>
+                )}
+
+                {manualLevel && manualWaterTreadingSeconds && manualDeepWaterConfidence && manualSessionMinutes && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex gap-4"
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-teal-500/20 text-teal-300">
+                      <Sparkles className="h-5 w-5" />
+                    </div>
+                    <div className="flex-1 space-y-3 pt-1.5">
+                      <p className="text-sm font-medium text-teal-50">Almost there! What are your fitness goals and preferred strokes? (Feel free to leave notes too).</p>
+                      <div className="grid gap-3">
+                        <input
+                          type="text"
+                          placeholder="Goals? (e.g. improve freestyle)"
+                          value={manualFitnessGoals}
+                          onChange={(event) => setManualFitnessGoals(event.target.value)}
+                          className="w-full rounded-xl border border-teal-500/20 bg-teal-950/20 px-4 py-3 text-teal-50 outline-none backdrop-blur-sm transition placeholder:text-teal-100/35 hover:bg-teal-950/40 focus:border-teal-400 focus:bg-teal-950/40 focus:ring-4 focus:ring-teal-500/10"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Preferred strokes? (e.g. freestyle, backstroke)"
+                          value={manualPreferredStrokes}
+                          onChange={(event) => setManualPreferredStrokes(event.target.value)}
+                          className="w-full rounded-xl border border-teal-500/20 bg-teal-950/20 px-4 py-3 text-teal-50 outline-none backdrop-blur-sm transition placeholder:text-teal-100/35 hover:bg-teal-950/40 focus:border-teal-400 focus:bg-teal-950/40 focus:ring-4 focus:ring-teal-500/10"
+                        />
+                        <textarea
+                          rows={2}
+                          placeholder="Any extra coach notes?"
+                          value={manualNotes}
+                          onChange={(event) => setManualNotes(event.target.value)}
+                          className="w-full resize-none rounded-xl border border-teal-500/20 bg-teal-950/20 px-4 py-3 text-teal-50 outline-none backdrop-blur-sm transition placeholder:text-teal-100/35 hover:bg-teal-950/40 focus:border-teal-400 focus:bg-teal-950/40 focus:ring-4 focus:ring-teal-500/10"
+                        />
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         </div>
