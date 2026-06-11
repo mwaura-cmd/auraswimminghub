@@ -4,9 +4,9 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const TEXTS = [
-  "The water is waiting...",
-  "Silence the noise. Find your rhythm.",
-  "Unlock your true stroke."
+  "BREATHE.",
+  "FEEL THE PULL.",
+  "FIND YOUR AURA."
 ];
 
 export function Preloader() {
@@ -17,7 +17,8 @@ export function Preloader() {
   useEffect(() => {
     setIsMounted(true);
     
-    if (sessionStorage.getItem("aura-preloader-done")) {
+    // Bypass if already seen this session
+    if (sessionStorage.getItem("aura-cinematic-preloader-done")) {
       setLoading(false);
       return;
     }
@@ -28,13 +29,13 @@ export function Preloader() {
           clearInterval(interval);
           setTimeout(() => {
             setLoading(false);
-            sessionStorage.setItem("aura-preloader-done", "true");
-          }, 2500); // Hold last text for 2.5s before revealing site
+            sessionStorage.setItem("aura-cinematic-preloader-done", "true");
+          }, 2500);
           return prev;
         }
         return prev + 1;
       });
-    }, 2800); // Span of ~2.8 seconds per text
+    }, 2800); // Max 3s constraint: 2.8s
 
     return () => clearInterval(interval);
   }, []);
@@ -45,75 +46,82 @@ export function Preloader() {
     <AnimatePresence>
       {loading && (
         <motion.div
-          key="preloader"
+          key="cinematic-preloader"
           initial={{ opacity: 1 }}
-          exit={{ opacity: 0, scale: 1.05, filter: "blur(10px)" }}
-          transition={{ duration: 0.8, ease: "easeInOut" }}
-          className="fixed inset-0 z-[9999] flex flex-col items-center justify-center overflow-hidden bg-[#020817]"
+          exit={{ opacity: 0, y: "-100%" }} // Sweeps up like resurfacing
+          transition={{ duration: 1.4, ease: [0.76, 0, 0.24, 1] }} 
+          className="fixed inset-0 z-[99999] flex flex-col items-center justify-center overflow-hidden bg-black"
         >
-          {/* Animated Deep Water Background */}
+          {/* SVG Filter for Liquid Distortion Effect */}
+          <svg className="hidden">
+            <filter id="liquid">
+              <feTurbulence type="fractalNoise" baseFrequency="0.015" numOctaves="3" result="noise" />
+              <feDisplacementMap in="SourceGraphic" in2="noise" scale="15" xChannelSelector="R" yChannelSelector="G" />
+            </filter>
+          </svg>
+
+          {/* Cinematic Underwater Swimmer Image (Unsplash) */}
           <motion.div 
-            animate={{ 
-              scale: [1, 1.1, 1],
-              opacity: [0.3, 0.5, 0.3] 
-            }}
-            transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(20,184,166,0.15),_transparent_60%)]"
+            initial={{ scale: 1.05, opacity: 0 }}
+            animate={{ scale: 1.15, opacity: 0.6 }}
+            transition={{ duration: 8, ease: "easeOut" }}
+            className="absolute inset-0 z-0 bg-[url('https://images.unsplash.com/photo-1530541930197-d86895ce0ff8?q=80&w=2670&auto=format&fit=crop')] bg-cover bg-center bg-no-repeat"
           />
+          
+          {/* Deep Abyss Vignette and Overlay Gradients for Depth */}
+          <div className="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_center,_transparent_0%,_#000000_100%)] opacity-90" />
+          <div className="absolute inset-0 z-0 bg-gradient-to-t from-black via-transparent to-black" />
 
-          {/* Minimalist Graphic (Swimmer Silhouette / Water) */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1, delay: 0.2 }}
-            className="absolute top-[35%] -mt-10 text-teal-500/40"
-          >
-            <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
-              <motion.path 
-                initial={{ pathLength: 0 }}
-                animate={{ pathLength: 1 }}
-                transition={{ duration: 2, ease: "easeInOut", repeat: Infinity, repeatType: "mirror" }}
-                d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"
-              />
-              <motion.path 
-                initial={{ pathLength: 0 }}
-                animate={{ pathLength: 1 }}
-                transition={{ duration: 2, delay: 0.3, ease: "easeInOut", repeat: Infinity, repeatType: "mirror" }}
-                d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"
-              />
-              <motion.path 
-                initial={{ pathLength: 0 }}
-                animate={{ pathLength: 1 }}
-                transition={{ duration: 2, delay: 0.6, ease: "easeInOut", repeat: Infinity, repeatType: "mirror" }}
-                d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"
-              />
-            </svg>
-          </motion.div>
+          {/* Enormous Background Typography (Ghost Outline) */}
+          <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center opacity-30 mix-blend-overlay">
+             <motion.h1 
+               initial={{ letterSpacing: "-0.05em", scale: 0.95 }}
+               animate={{ letterSpacing: "0.15em", scale: 1.05 }}
+               transition={{ duration: 9, ease: "easeOut" }}
+               className="font-space-grotesk text-[30vw] font-black uppercase leading-none text-transparent"
+               style={{ WebkitTextStroke: "1px rgba(255,255,255,0.4)" }}
+             >
+                AURA
+             </motion.h1>
+          </div>
 
-          {/* Animated Text Sequence */}
-          <div className="relative mt-8 flex h-20 items-center justify-center">
+          {/* Focal Text Sequence with Liquid Blur */}
+          <div className="relative z-10 flex h-40 w-full items-center justify-center px-4">
             <AnimatePresence mode="wait">
-              <motion.h2
+              <motion.div
                 key={index}
-                initial={{ opacity: 0, y: 15, filter: "blur(8px)" }}
+                initial={{ opacity: 0, y: 40, filter: "url(#liquid) blur(10px)" }}
                 animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                exit={{ opacity: 0, y: -15, filter: "blur(8px)" }}
-                transition={{ duration: 0.8, ease: "easeOut" }}
-                className="absolute w-full px-4 text-center font-space-grotesk text-2xl font-light tracking-wide text-teal-50 md:text-3xl lg:text-4xl"
+                exit={{ opacity: 0, y: -40, filter: "url(#liquid) blur(10px)", scale: 1.05 }}
+                transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+                className="text-center font-space-grotesk text-3xl font-light tracking-[0.2em] text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.5)] md:text-5xl lg:text-7xl"
               >
                 {TEXTS[index]}
-              </motion.h2>
+              </motion.div>
             </AnimatePresence>
           </div>
           
-          {/* Subtle Progress Bar */}
-          <div className="absolute bottom-16 left-1/2 h-[1px] w-48 -translate-x-1/2 overflow-hidden bg-white/10 sm:w-64">
+          {/* Sleek Understated Progress Indicator */}
+          <div className="absolute bottom-16 left-1/2 flex -translate-x-1/2 flex-col items-center gap-5">
              <motion.div 
-               initial={{ x: "-100%" }}
-               animate={{ x: "0%" }}
-               transition={{ duration: 8, ease: "linear" }}
-               className="h-full w-full bg-teal-400"
-             />
+               initial={{ opacity: 0, y: 10 }}
+               animate={{ opacity: 1, y: 0 }}
+               transition={{ delay: 0.8, duration: 1 }}
+               className="text-[10px] uppercase tracking-[0.5em] text-white/50"
+             >
+                Entering deep water
+             </motion.div>
+             <div className="h-[1px] w-64 overflow-hidden bg-white/10 md:w-80">
+               <motion.div 
+                 initial={{ x: "-100%" }}
+                 animate={{ x: "0%" }}
+                 transition={{ duration: 8.4, ease: "linear" }}
+                 className="h-full w-full bg-teal-400"
+                 style={{
+                   boxShadow: "0 0 20px 2px rgba(45, 212, 191, 0.6)"
+                 }}
+               />
+             </div>
           </div>
         </motion.div>
       )}
