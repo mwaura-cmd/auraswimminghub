@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ArrowRight, ShieldCheck, Trophy, Waves, TimerReset, Dumbbell } from "lucide-react";
+import { ArrowRight, ShieldCheck, Trophy, Waves, TimerReset, Dumbbell, MapPin, Star } from "lucide-react";
+import * as motion from "framer-motion/client";
 import { HomeGalleryPreview } from "@/components/home-gallery-preview";
 import { MountainBreezeMap } from "@/components/mountain-breeze-map";
 import { MotionItem, MotionSection } from "@/components/motion-section";
@@ -10,44 +11,149 @@ import { BILLING_CYCLE_MULTIPLIER, DAILY_RATE_KES, LEARNER_GROUPS, formatKes } f
 export default function Home() {
   return (
     <div className="pb-20">
-      <MotionSection className="section-shell relative overflow-hidden rounded-3xl border border-teal-500/30 bg-black/70 px-6 py-24 md:px-14">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(20,184,166,0.2),_transparent_45%),linear-gradient(110deg,rgba(3,7,18,0.25),rgba(3,7,18,0.9))]" />
-        <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-teal-500/15 blur-3xl" />
-        <div className="relative mx-auto max-w-4xl text-center">
-          <p className="mb-4 text-sm uppercase tracking-[0.4em] text-teal-300">Mountain Breeze Hotel, Embu</p>
-          <h1 className="text-4xl leading-tight md:text-6xl">Discover Your Aura In The Water</h1>
-          <p className="mx-auto mt-5 max-w-2xl text-base text-teal-50/80 md:text-lg">
-            Professional swimming lessons for kids, teens, and adults at Mountain Breeze Hotel, Embu.
-          </p>
-          <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
-            <Link className="btn-primary inline-flex items-center gap-2" href="/book">
-              Book a Class <ArrowRight size={16} />
-            </Link>
-            <Link className="btn-secondary" href="/programs">
-              View Programs
-            </Link>
-            <Link className="btn-secondary bg-teal-500/20 text-teal-50 border-teal-500/30 hover:bg-teal-500/30" href="/login">
-              Login to Portal
-            </Link>
+      {/* 
+        Aesthetic Cinematic Hero Section 
+        (Full screen presence, rich typography, depth layers, dynamic badges)
+      */}
+      <section className="relative flex min-h-[92vh] w-full flex-col justify-end overflow-hidden px-6 pb-20 pt-40 md:min-h-screen md:px-14 md:pb-32">
+        
+        {/* Deep Cinematic Background */}
+        <div className="absolute inset-0 z-0 select-none">
+          <motion.div 
+            initial={{ scale: 1.1, opacity: 0 }}
+            animate={{ scale: 1, opacity: 0.4 }}
+            transition={{ duration: 2, ease: "easeOut" }}
+            className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1519330953047-8a6db9e925b3?q=80&w=2670&auto=format&fit=crop')] bg-cover bg-center bg-no-repeat mix-blend-luminosity"
+          />
+          {/* Gradient masking for smooth fade into the rest of the site */}
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-slate-950 via-slate-950/90 to-transparent" />
+          
+          {/* Subtle teal atmospheric glow */}
+          <div className="absolute -top-[20%] right-[10%] h-[600px] w-[600px] rounded-full bg-teal-500/10 blur-[100px]" />
+          <div className="absolute -bottom-[10%] -left-[10%] h-[500px] w-[500px] rounded-full bg-teal-800/20 blur-[120px]" />
+        </div>
+
+        {/* Floating Abstract Element (Like water ripples) */}
+        <div className="pointer-events-none absolute right-[5%] top-[25%] z-0 hidden lg:block">
+          <motion.div
+            initial={{ opacity: 0, rotate: -45 }}
+            animate={{ opacity: 1, rotate: 0 }}
+            transition={{ duration: 1.5, delay: 0.5, ease: "easeOut" }}
+            className="text-teal-500/10"
+          >
+            <svg width="400" height="400" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+              <path fill="currentColor" d="M44.7,-76.4C58.8,-69.2,71.8,-59.1,81.3,-46.3C90.8,-33.5,96.8,-18,95.5,-3C94.2,12,85.6,26,75,37.3C64.4,48.6,51.8,57.2,38.3,64C24.8,70.8,10.4,75.8,-4.2,83.1C-18.8,90.4,-33.6,100,-46.8,95.5C-60,91,-71.6,72.4,-77.8,54.8C-84,37.2,-84.8,20.6,-82.5,5.2C-80.2,-10.2,-74.8,-24.4,-67.2,-37.1C-59.6,-49.8,-50,-61,-37.8,-69.4C-25.6,-77.8,-10.8,-83.4,2.8,-88.4C16.4,-93.4,30.6,-83.6,44.7,-76.4Z" transform="translate(100 100)" />
+            </svg>
+          </motion.div>
+        </div>
+
+        {/* Premium Content Stack */}
+        <div className="relative z-10 w-full max-w-7xl mx-auto">
+          <motion.div 
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.1, ease: "easeOut" }}
+            className="mb-6 flex flex-wrap items-center gap-3"
+          >
+            <div className="inline-flex items-center gap-2 rounded-full border border-teal-500/30 bg-teal-950/40 py-1.5 pl-2 pr-4 text-xs font-medium text-teal-200 backdrop-blur-md">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-teal-500">
+                <MapPin size={12} className="text-teal-950" />
+              </span>
+              Mountain Breeze Hotel, Embu
+            </div>
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-white/5 bg-white/5 px-3 py-1.5 text-xs text-slate-300 backdrop-blur-md">
+              <Star size={12} className="fill-amber-400 text-amber-400" />
+              <span>Elite Training</span>
+            </div>
+          </motion.div>
+
+          <div className="max-w-4xl">
+            <motion.h1 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
+              className="font-space-grotesk text-5xl font-medium tracking-tight text-white sm:text-6xl md:text-[5.5rem] md:leading-[1.05]"
+            >
+              Master The <br className="hidden md:block"/>
+              <span className="bg-gradient-to-r from-teal-300 via-teal-100 to-white bg-clip-text text-transparent italic pr-2">Fluidity</span> Within.
+            </motion.h1>
+            
+            <motion.p 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.3, ease: "easeOut" }}
+              className="mt-6 max-w-2xl text-lg font-light leading-relaxed text-slate-300 md:text-xl"
+            >
+              Elevate your technique, build unshakable confidence, and conquer the water with world-class coaching designed for the modern swimmer.
+            </motion.p>
+
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.4, ease: "easeOut" }}
+              className="mt-10 flex flex-wrap items-center gap-5"
+            >
+              <Link 
+                href="/book" 
+                className="group relative inline-flex items-center gap-3 overflow-hidden rounded-full bg-teal-400 px-8 py-4 font-space-grotesk text-sm font-semibold tracking-wide text-teal-950 transition-all hover:bg-teal-300 hover:shadow-[0_0_20px_rgba(45,212,191,0.3)]"
+              >
+                <span>Book Your Session</span>
+                <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
+              </Link>
+              <Link 
+                href="/programs" 
+                className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-transparent px-8 py-4 font-space-grotesk text-sm font-medium tracking-wide text-white transition-all hover:bg-white/10 hover:border-white/40"
+              >
+                Explore Programs
+              </Link>
+            </motion.div>
           </div>
         </div>
-      </MotionSection>
 
-      <MotionSection className="section-shell mt-16 grid gap-4 md:grid-cols-3">
-        {[
-          { icon: Trophy, title: "Professional Coaching", text: "Certified elite coaches with progressive, age-based curriculum." },
-          { icon: ShieldCheck, title: "Safe Hotel Pool Environment", text: "Premium controlled facility with monitored session safety." },
-          { icon: Waves, title: "Progress Tracking Portal", text: "Every stroke, score, and attendance record in one smart dashboard." },
-        ].map((item) => (
-          <MotionItem key={item.title}>
-            <article className="glass-card rounded-2xl p-6">
-              <item.icon className="mb-4 text-teal-300" />
-              <h3 className="text-lg">{item.title}</h3>
-              <p className="mt-2 text-sm text-teal-50/75">{item.text}</p>
-            </article>
-          </MotionItem>
-        ))}
-      </MotionSection>
+        {/* Scrolling Indicator */}
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 1, delay: 1 }}
+          className="absolute bottom-10 left-6 hidden items-center gap-4 text-xs font-medium tracking-widest text-slate-500 uppercase md:flex lg:left-14"
+        >
+          <span className="-rotate-90">Scroll</span>
+          <div className="h-16 w-[1px] overflow-hidden bg-white/10">
+             <motion.div 
+               animate={{ y: ["-100%", "200%"] }}
+               transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+               className="h-1/2 w-full bg-teal-500"
+             />
+          </div>
+        </motion.div>
+      </section>
+
+      {/* Main Extracted Details Overlay (Sleek floating stats bar) */}
+      <div className="relative z-20 mx-auto -mt-10 mb-20 max-w-7xl px-4 sm:-mt-16 md:px-6">
+        <MotionSection 
+          viewport={{ once: true }} 
+          className="grid gap-px overflow-hidden rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl md:grid-cols-3"
+        >
+          {[
+            { icon: Trophy, title: "Elite Coaching", text: "Curriculum backed by science." },
+            { icon: ShieldCheck, title: "Controlled Safety", text: "Monitored premium facility." },
+            { icon: Waves, title: "Digital Tracker", text: "Every session logged instantly." },
+          ].map((item, i) => (
+            <div key={item.title} className={`bg-slate-950/80 p-6 md:p-8 hover:bg-slate-950/60 transition-colors ${i !== 0 ? "hidden md:block" : ""}`}>
+              <div className="flex items-start gap-4">
+                <div className="rounded-xl border border-teal-500/20 bg-teal-500/10 p-3 text-teal-300">
+                  <item.icon size={20} />
+                </div>
+                <div>
+                  <h3 className="font-space-grotesk text-lg font-medium text-white">{item.title}</h3>
+                  <p className="mt-1 text-sm text-slate-400">{item.text}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </MotionSection>
+      </div>
 
       <MotionSection className="section-shell mt-20">
         <div className="mb-8 flex items-end justify-between">
