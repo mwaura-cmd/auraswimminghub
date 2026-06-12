@@ -52,6 +52,16 @@ export function Preloader() {
           transition={{ duration: 1.6, ease: [0.76, 0, 0.24, 1] }} 
           className="fixed inset-0 z-[99999] flex flex-col items-center justify-center overflow-hidden bg-black"
         >
+          {/* Custom Brand Logo */}
+          <motion.img 
+            src="/brand-logo.png" 
+            alt="Aura Swimming Hub" 
+            initial={{ opacity: 0, y: -20, filter: "blur(10px)" }}
+            animate={{ opacity: 0.9, y: 0, filter: "blur(0px)" }}
+            transition={{ duration: 2, delay: 0.5, ease: "easeOut" }}
+            className="absolute top-12 z-20 w-16 drop-shadow-[0_0_20px_rgba(45,212,191,0.6)] md:top-16 md:w-20"
+          />
+
           {/* SVG Filter for Liquid Distortion Effect */}
           <svg className="hidden">
             <filter id="liquid">
