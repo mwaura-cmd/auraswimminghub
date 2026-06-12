@@ -47,9 +47,9 @@ export function Preloader() {
       {loading && (
         <motion.div
           key="cinematic-preloader"
-          initial={{ opacity: 1 }}
-          exit={{ opacity: 0, y: "-100%" }} // Sweeps up like resurfacing
-          transition={{ duration: 1.4, ease: [0.76, 0, 0.24, 1] }} 
+          initial={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+          exit={{ opacity: 0, scale: 1.5, filter: "blur(25px)" }} // Massive zoom-through effect
+          transition={{ duration: 1.6, ease: [0.76, 0, 0.24, 1] }} 
           className="fixed inset-0 z-[99999] flex flex-col items-center justify-center overflow-hidden bg-black"
         >
           {/* SVG Filter for Liquid Distortion Effect */}
