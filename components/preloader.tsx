@@ -52,23 +52,88 @@ export function Preloader() {
           transition={{ duration: 1.6, ease: [0.76, 0, 0.24, 1] }} 
           className="fixed inset-0 z-[99999] flex flex-col items-center justify-center overflow-hidden bg-black"
         >
-          {/* Custom Brand Logo */}
-          <motion.img 
-            src="/brand-logo.png" 
-            alt="Aura Swimming Hub" 
-            initial={{ opacity: 0, y: -20, filter: "blur(10px)" }}
-            animate={{ opacity: 0.9, y: 0, filter: "blur(0px)" }}
-            transition={{ duration: 2, delay: 0.5, ease: "easeOut" }}
-            className="absolute top-12 z-20 w-16 drop-shadow-[0_0_20px_rgba(45,212,191,0.6)] md:top-16 md:w-20"
-          />
+           {/* Custom Brand Logo with Underwater Shimmer */}
+           <motion.img 
+             src="/brand-logo.png" 
+             alt="Aura Swimming Hub" 
+             initial={{ opacity: 0, y: -20, filter: "blur(10px)" }}
+             animate={{ 
+               opacity: 0.9, 
+               y: [0, -15, 0], 
+               filter: "url(#caustic)" 
+             }}
+             transition={{ 
+               duration: 2, 
+               delay: 0.5, 
+               ease: "easeOut",
+               y: { duration: 5, repeat: Infinity, ease: "easeInOut" }
+             }}
+             className="absolute top-12 z-20 w-16 drop-shadow-[0_0_20px_rgba(45,212,191,0.6)] md:top-16 md:w-20"
+           />
 
-          {/* SVG Filter for Liquid Distortion Effect */}
-          <svg className="hidden">
-            <filter id="liquid">
-              <feTurbulence type="fractalNoise" baseFrequency="0.015" numOctaves="3" result="noise" />
-              <feDisplacementMap in="SourceGraphic" in2="noise" scale="15" xChannelSelector="R" yChannelSelector="G" />
-            </filter>
-          </svg>
+           {/* Underwater Bubbles */}
+           <div className="absolute inset-0 z-10 pointer-events-none">
+             <motion.div 
+               initial={{ opacity: 0, x: -80, y: 120, scale: 0 }}
+               animate={{ opacity: 0.3, x: -100, y: 80, scale: 0.8 }}
+               transition={{ duration: 8, delay: 1, repeat: Infinity, ease: "easeInOut" }}
+               className="w-3 h-3 bg-teal-400/30 rounded-full drop-shadow-[0_0_8px_rgba(45,212,191,0.4)]"
+             />
+             <motion.div 
+               initial={{ opacity: 0, x: 60, y: 100, scale: 0 }}
+               animate={{ opacity: 0.4, x: 40, y: 40, scale: 0.6 }}
+               transition={{ duration: 6, delay: 2, repeat: Infinity, ease: "easeInOut" }}
+               className="w-2 h-2 bg-teal-300/25 rounded-full drop-shadow-[0_0_6px_rgba(45,212,191,0.3)]"
+             />
+             <motion.div 
+               initial={{ opacity: 0, x: -40, y: 140, scale: 0 }}
+               animate={{ opacity: 0.2, x: -20, y: 60, scale: 0.4 }}
+               transition={{ duration: 10, delay: 1.5, repeat: Infinity, ease: "easeInOut" }}
+               className="w-4 h-4 bg-teal-200/20 rounded-full drop-shadow-[0_0_10px_rgba(45,212,191,0.5)]"
+             />
+           </div>
+
+            {/* Light Rays */}
+            <div className="absolute inset-0 z-10 pointer-events-none">
+              <motion.div 
+                initial={{ opacity: 0, rotate: 0, scale: 1.2 }}
+                animate={{ opacity: 0.15, rotate: 5, scale: 1.3 }}
+                transition={{ duration: 12, delay: 0.5, repeat: Infinity, ease: "linear" }}
+                className="w-[200px] h-[2px] bg-teal-400/30 left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2"
+              />
+              <motion.div 
+                initial={{ opacity: 0, rotate: 0, scale: 1.1 }}
+                animate={{ opacity: 0.1, rotate: -3, scale: 1.2 }}
+                transition={{ duration: 15, delay: 2, repeat: Infinity, ease: "linear" }}
+                className="w-[180px] h-[1.5px] bg-teal-300/25 left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2"
+              />
+            </div>
+
+            {/* SVG Filter for Underwater Caustic Shimmer Effect */}
+           <svg className="hidden">
+             <filter id="caustic">
+               <!-- Base turbulence for light rays -->
+               <feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="3" result="noise1">
+                 <animate attributeName="baseFrequency" values="0.015;0.025;0.015" dur="8s" repeatCount="indefinite"/>
+               </feTurbulence>
+               <!-- Second turbulence layer for variation -->
+               <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" result="noise2">
+                 <animate attributeName="baseFrequency" values="0.04;0.06;0.04" dur="6s" repeatCount="indefinite"/>
+               </feTurbulence>
+               <!-- Combine turbulence layers -->
+               <feAdd in="noise1" in2="noise2" result="combinedNoise"/>
+               <!-- Apply displacement map for light bending -->
+               <feDisplacementMap in="SourceGraphic" in2="combinedNoise" scale="8" xChannelSelector="R" yChannelSelector="G" result="displaced">
+                 <animate attributeName="scale" values="6;10;6" dur="7s" repeatCount="indefinite"/>
+               </feDisplacementMap>
+               <!-- Add subtle glow -->
+               <feGaussianBlur in="displaced" stdDeviation="1.5" result="blurred"/>
+               <feMerge>
+                 <feMergeNode in="blurred"/>
+                 <feMergeNode in="SourceGraphic"/>
+               </feMerge>
+             </filter>
+           </svg>
 
           {/* Cinematic Underwater Swimmer Image (Unsplash) */}
           <motion.div 
