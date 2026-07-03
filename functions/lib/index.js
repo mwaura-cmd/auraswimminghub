@@ -50,6 +50,60 @@ function formatKes(amount) {
     }
     return `KES ${new Intl.NumberFormat("en-KE").format(amount ?? 0)}`;
 }
+function escapeHtml(input) {
+    return input
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+function buildTelegramBookingMessage(booking, bookingId, state) {
+    const title = state === "confirmed" ? "Booking confirmed" : "New booking received";
+    const learner = booking.learnerName ?? "(unknown learner)";
+    const guardian = booking.fullName ?? "(unknown guardian)";
+    const email = booking.email ?? "(no email)";
+    const program = booking.program ?? "(no program)";
+    const date = booking.date ?? "TBD";
+    const time = booking.time ?? "TBD";
+    const amount = formatKes(booking.amountKes);
+    const reference = booking.paystackReference ?? bookingId;
+    return [
+        `<b>${escapeHtml(title)}</b>`,
+        `Learner: ${escapeHtml(learner)}`,
+        `Guardian: ${escapeHtml(guardian)}`,
+        `Email: ${escapeHtml(email)}`,
+        `Program: ${escapeHtml(program)}`,
+        `Date: ${escapeHtml(date)}`,
+        `Time: ${escapeHtml(time)}`,
+        `Amount: ${escapeHtml(amount)}`,
+        `Reference: ${escapeHtml(reference)}`,
+    ].join("\n");
+}
+async function sendTelegramBookingAlert(booking, bookingId, state) {
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.TELEGRAM_CHAT_ID;
+    if (!botToken || !chatId) {
+        firebase_functions_1.logger.warn("Telegram config missing; set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID.");
+        return;
+    }
+    const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+            chat_id: chatId,
+            text: buildTelegramBookingMessage(booking, bookingId, state),
+            parse_mode: "HTML",
+            disable_web_page_preview: true,
+        }),
+    });
+    if (!response.ok) {
+        const errorText = await response.text();
+        firebase_functions_1.logger.error("Telegram booking alert failed", { status: response.status, errorText });
+    }
+}
 function buildLearnerConfirmedEmail(booking, bookingId) {
     const name = booking.fullName ?? "there";
     const learner = booking.learnerName ?? "your learner";
@@ -193,6 +247,7 @@ async function sendResendEmail(params) {
     }
 }
 async function sendBookingConfirmedEmails(booking, bookingId) {
+    await sendTelegramBookingAlert(booking, bookingId, "confirmed");
     const learnerEmail = booking.email;
     if (learnerEmail) {
         const message = buildLearnerConfirmedEmail(booking, bookingId);
@@ -205,6 +260,7 @@ async function sendBookingConfirmedEmails(booking, bookingId) {
     }
 }
 async function sendBookingPendingEmails(booking, bookingId) {
+    await sendTelegramBookingAlert(booking, bookingId, "pending");
     const learnerEmail = booking.email;
     if (learnerEmail) {
         const message = buildLearnerPendingEmail(booking, bookingId);

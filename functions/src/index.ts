@@ -21,6 +21,8 @@ type BookingRecord = {
   userId?: string | null;
 };
 
+type BookingAlertState = "pending" | "confirmed";
+
 function isPaidStatus(status?: string) {
   return status === "paid" || status === "confirmed";
 }
@@ -31,6 +33,67 @@ function formatKes(amount?: number) {
   }
 
   return `KES ${new Intl.NumberFormat("en-KE").format(amount ?? 0)}`;
+}
+
+function escapeHtml(input: string) {
+  return input
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function buildTelegramBookingMessage(booking: BookingRecord, bookingId: string, state: BookingAlertState) {
+  const title = state === "confirmed" ? "Booking confirmed" : "New booking received";
+  const learner = booking.learnerName ?? "(unknown learner)";
+  const guardian = booking.fullName ?? "(unknown guardian)";
+  const email = booking.email ?? "(no email)";
+  const program = booking.program ?? "(no program)";
+  const date = booking.date ?? "TBD";
+  const time = booking.time ?? "TBD";
+  const amount = formatKes(booking.amountKes);
+  const reference = booking.paystackReference ?? bookingId;
+
+  return [
+    `<b>${escapeHtml(title)}</b>`,
+    `Learner: ${escapeHtml(learner)}`,
+    `Guardian: ${escapeHtml(guardian)}`,
+    `Email: ${escapeHtml(email)}`,
+    `Program: ${escapeHtml(program)}`,
+    `Date: ${escapeHtml(date)}`,
+    `Time: ${escapeHtml(time)}`,
+    `Amount: ${escapeHtml(amount)}`,
+    `Reference: ${escapeHtml(reference)}`,
+  ].join("\n");
+}
+
+async function sendTelegramBookingAlert(booking: BookingRecord, bookingId: string, state: BookingAlertState) {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+
+  if (!botToken || !chatId) {
+    logger.warn("Telegram config missing; set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID.");
+    return;
+  }
+
+  const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text: buildTelegramBookingMessage(booking, bookingId, state),
+      parse_mode: "HTML",
+      disable_web_page_preview: true,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    logger.error("Telegram booking alert failed", { status: response.status, errorText });
+  }
 }
 
 function buildLearnerConfirmedEmail(booking: BookingRecord, bookingId: string) {
@@ -209,6 +272,8 @@ async function sendResendEmail(params: {
 }
 
 async function sendBookingConfirmedEmails(booking: BookingRecord, bookingId: string) {
+  await sendTelegramBookingAlert(booking, bookingId, "confirmed");
+
   const learnerEmail = booking.email;
   if (learnerEmail) {
     const message = buildLearnerConfirmedEmail(booking, bookingId);
@@ -223,6 +288,8 @@ async function sendBookingConfirmedEmails(booking: BookingRecord, bookingId: str
 }
 
 async function sendBookingPendingEmails(booking: BookingRecord, bookingId: string) {
+  await sendTelegramBookingAlert(booking, bookingId, "pending");
+
   const learnerEmail = booking.email;
   if (learnerEmail) {
     const message = buildLearnerPendingEmail(booking, bookingId);
