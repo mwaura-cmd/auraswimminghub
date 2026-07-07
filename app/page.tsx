@@ -4,34 +4,14 @@ import { HomeGalleryPreview } from "@/components/home-gallery-preview";
 import { MountainBreezeMap } from "@/components/mountain-breeze-map";
 import { MotionItem, MotionSection } from "@/components/motion-section";
 import { TestimonialsByAge } from "@/components/testimonials-by-age";
+import { ParallaxHero } from "@/components/parallax-hero";
 import { PROGRAMS } from "@/lib/constants";
 import { BILLING_CYCLE_MULTIPLIER, DAILY_RATE_KES, LEARNER_GROUPS, formatKes } from "@/lib/pricing";
 
 export default function Home() {
   return (
     <div className="pb-20">
-      <MotionSection className="section-shell relative overflow-hidden rounded-3xl border border-teal-500/30 bg-black/70 px-6 py-24 md:px-14">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(20,184,166,0.2),_transparent_45%),linear-gradient(110deg,rgba(3,7,18,0.25),rgba(3,7,18,0.9))]" />
-        <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-teal-500/15 blur-3xl" />
-        <div className="relative mx-auto max-w-4xl text-center">
-          <p className="mb-4 text-sm uppercase tracking-[0.4em] text-teal-300">Mountain Breeze Hotel, Embu</p>
-          <h1 className="text-4xl leading-tight md:text-6xl">Discover Your Aura In The Water</h1>
-          <p className="mx-auto mt-5 max-w-2xl text-base text-teal-50/80 md:text-lg">
-            Professional swimming lessons for kids, teens, and adults at Mountain Breeze Hotel, Embu.
-          </p>
-          <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
-            <Link className="btn-primary inline-flex items-center gap-2" href="/book">
-              Book a Class <ArrowRight size={16} />
-            </Link>
-            <Link className="btn-secondary" href="/programs">
-              View Programs
-            </Link>
-            <Link className="btn-secondary bg-teal-500/20 text-teal-50 border-teal-500/30 hover:bg-teal-500/30" href="/login">
-              Login to Portal
-            </Link>
-          </div>
-        </div>
-      </MotionSection>
+      <ParallaxHero />
 
       <MotionSection className="section-shell mt-16 grid gap-4 md:grid-cols-3">
         {[
