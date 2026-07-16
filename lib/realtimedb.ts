@@ -1,7 +1,7 @@
 import { equalTo, get, onValue, orderByChild, push, query, ref, set, update } from "firebase/database";
 import { onAuthStateChanged } from "firebase/auth";
 import { getFirebaseAuth, getFirebaseRtdb, isFirebaseConfigured } from "@/lib/firebase";
-import { AttendanceStatus, Booking, BookingInput, GalleryItem, GalleryMediaType, PlatformUser, SwimmerProfile, UserRole } from "@/lib/types";
+import { AttendanceStatus, Booking, BookingInput, GalleryItem, GalleryMediaType, PlatformUser, SwimmerProfile, UserRole, WorkoutFeedback, WorkoutFeedbackRating } from "@/lib/types";
 
 function buildDefaultSwimmerProfile(): SwimmerProfile {
   return {
@@ -351,4 +351,55 @@ export async function deleteGalleryItem(itemId: string) {
 
   const itemRef = ref(rtdb, `gallery/${itemId}`);
   await set(itemRef, null);
+}
+
+interface SaveWorkoutFeedbackInput {
+  workoutTitle: string;
+  rating: WorkoutFeedbackRating;
+  requestedMinutes: number;
+  note?: string;
+}
+
+export async function saveWorkoutFeedback(input: SaveWorkoutFeedbackInput): Promise<string> {
+  const auth = getFirebaseAuth();
+  const rtdb = getFirebaseRtdb();
+  if (!isFirebaseConfigured() || !auth || !rtdb) {
+    throw new Error("Firebase not configured");
+  }
+
+  const currentUser = auth.currentUser;
+  if (!currentUser) {
+    throw new Error("You must be signed in to save workout feedback.");
+  }
+
+  const feedbackRef = ref(rtdb, `coachFeedback/${currentUser.uid}`);
+  const newFeedbackRef = await push(feedbackRef, {
+    userId: currentUser.uid,
+    workoutTitle: input.workoutTitle.trim(),
+    rating: input.rating,
+    note: input.note?.trim() ?? "",
+    requestedMinutes: Math.max(15, Math.min(60, Math.round(input.requestedMinutes))),
+    createdAt: new Date().toISOString(),
+  });
+
+  return newFeedbackRef.key ?? "";
+}
+
+export async function getRecentWorkoutFeedback(userId: string, limit = 5): Promise<WorkoutFeedback[]> {
+  const rtdb = getFirebaseRtdb();
+  if (!isFirebaseConfigured() || !rtdb || !userId) {
+    return [];
+  }
+
+  const feedbackRef = ref(rtdb, `coachFeedback/${userId}`);
+  const snapshot = await get(feedbackRef);
+  if (!snapshot.exists()) {
+    return [];
+  }
+
+  const data = snapshot.val() as Record<string, Omit<WorkoutFeedback, "id">>;
+  return Object.entries(data)
+    .map(([id, item]) => ({ id, ...item }))
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, limit);
 }

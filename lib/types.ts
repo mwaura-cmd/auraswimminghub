@@ -31,6 +31,18 @@ export interface GeneratedWorkout {
   estimatedMinutes?: number;
 }
 
+export type WorkoutFeedbackRating = "up" | "down";
+
+export interface WorkoutFeedback {
+  id: string;
+  userId: string;
+  workoutTitle: string;
+  rating: WorkoutFeedbackRating;
+  note?: string;
+  requestedMinutes: number;
+  createdAt: string;
+}
+
 export type ProgramType =
   | "Toddlers & Kids"
   | "Teens"

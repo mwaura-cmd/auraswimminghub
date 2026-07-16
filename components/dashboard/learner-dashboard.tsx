@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Check, LoaderCircle, Trophy, CalendarDays, ReceiptText, Clock3, Sparkles } from "lucide-react";
+import { Check, LoaderCircle, Trophy, CalendarDays, ReceiptText, Clock3, Sparkles, ThumbsDown, ThumbsUp } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/components/providers/auth-provider";
 import { formatSessionDate, formatSessionTime, getSessionDate, isUpcomingBooking } from "@/lib/booking-utils";
 import { BILLING_CYCLES, BILLING_CYCLE_LABEL, formatKes } from "@/lib/pricing";
-import { subscribeBookings, subscribeUserProfile } from "@/lib/realtimedb";
+import { saveWorkoutFeedback, subscribeBookings, subscribeUserProfile } from "@/lib/realtimedb";
 import { getFirebaseAuth } from "@/lib/firebase";
 import { AttendanceStatus, Booking, GeneratedWorkout, PlatformUser, SwimLevel, SwimmerProfile } from "@/lib/types";
 
@@ -47,6 +47,9 @@ export function LearnerDashboard() {
   const [manualNotes, setManualNotes] = useState("");
   const [workoutBusy, setWorkoutBusy] = useState(false);
   const [workoutError, setWorkoutError] = useState("");
+  const [feedbackBusy, setFeedbackBusy] = useState(false);
+  const [feedbackNote, setFeedbackNote] = useState("");
+  const [feedbackStatus, setFeedbackStatus] = useState("");
   const [completedItems, setCompletedItems] = useState<Record<string, boolean>>({});
   const [bookingError, setBookingError] = useState("");
   const [profileError, setProfileError] = useState("");
@@ -325,6 +328,8 @@ export function LearnerDashboard() {
   useEffect(() => {
     setWorkout(null);
     setCompletedItems({});
+    setFeedbackNote("");
+    setFeedbackStatus("");
   }, [manualSwimmerProfile]);
 
   const workoutCompletion = useMemo(() => {
@@ -350,6 +355,7 @@ export function LearnerDashboard() {
   const handleGenerateWorkout = async () => {
     setWorkoutBusy(true);
     setWorkoutError("");
+    setFeedbackStatus("");
     let timeoutHandle: number | undefined;
 
     try {
@@ -390,6 +396,7 @@ export function LearnerDashboard() {
 
       setWorkout(data.workout ?? null);
       setCompletedItems({});
+      setFeedbackNote("");
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
         setWorkoutError("Generation took too long. Please try again.");
@@ -409,6 +416,30 @@ export function LearnerDashboard() {
       ...current,
       [itemKey]: !current[itemKey],
     }));
+  };
+
+  const handleWorkoutFeedback = async (rating: "up" | "down") => {
+    if (!workout) {
+      return;
+    }
+
+    setFeedbackBusy(true);
+    setFeedbackStatus("");
+
+    try {
+      await saveWorkoutFeedback({
+        workoutTitle: workout.workout_title,
+        rating,
+        requestedMinutes: workout.requestedMinutes ?? manualSwimmerProfile?.sessionTimeLimitMinutes ?? 40,
+        note: feedbackNote,
+      });
+      setFeedbackStatus(rating === "up" ? "Saved as a good fit." : "Saved for the next adjustment.");
+      setFeedbackNote("");
+    } catch (error) {
+      setFeedbackStatus(error instanceof Error ? error.message : "Could not save feedback.");
+    } finally {
+      setFeedbackBusy(false);
+    }
   };
 
   const renderWorkoutSection = (title: string, items: { description: string; distance?: string; duration?: string; reps?: number }[], tone: string) => {
@@ -708,6 +739,43 @@ export function LearnerDashboard() {
 
               <div className="rounded-2xl border border-teal-500/20 bg-black/40 p-4 text-sm text-teal-50/80">
                 Estimated duration: <span className="font-semibold text-teal-50">{workout.estimatedMinutes ?? manualSwimmerProfile?.sessionTimeLimitMinutes ?? 40} min</span>
+              </div>
+
+              <div className="rounded-2xl border border-teal-500/20 bg-black/40 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.24em] text-teal-300">Train Coach Assist</p>
+                    <h3 className="mt-1 text-lg text-teal-50">Tell us if this set was on point</h3>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleWorkoutFeedback("up")}
+                      disabled={feedbackBusy}
+                      className="inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-100 transition hover:border-emerald-400/60 hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <ThumbsUp className="h-4 w-4" />
+                      Fits me
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleWorkoutFeedback("down")}
+                      disabled={feedbackBusy}
+                      className="inline-flex items-center gap-2 rounded-full border border-rose-400/30 bg-rose-500/10 px-4 py-2 text-sm text-rose-100 transition hover:border-rose-400/60 hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <ThumbsDown className="h-4 w-4" />
+                      Too much / too little
+                    </button>
+                  </div>
+                </div>
+                <textarea
+                  rows={3}
+                  value={feedbackNote}
+                  onChange={(event) => setFeedbackNote(event.target.value)}
+                  placeholder="Optional note: what should the next set change?"
+                  className="mt-4 w-full resize-none rounded-xl border border-teal-500/20 bg-teal-950/20 px-4 py-3 text-teal-50 outline-none transition placeholder:text-teal-100/35 hover:bg-teal-950/35 focus:border-teal-400 focus:bg-teal-950/35"
+                />
+                {feedbackStatus && <p className="mt-3 text-xs text-teal-100/75">{feedbackStatus}</p>}
               </div>
             </div>
           )}

@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getAdminAuth, getAdminRtdb } from "@/lib/firebase-admin";
-import { Booking, PlatformUser, SwimmerProfile } from "@/lib/types";
+import { Booking, PlatformUser, SwimmerProfile, WorkoutFeedback } from "@/lib/types";
 
 type GenerateSetRequest = {
   requestedMinutes?: number;
   swimmerProfile?: Partial<SwimmerProfile>;
+};
+
+type FeedbackSummary = {
+  note?: string;
+  rating: WorkoutFeedback["rating"];
+  requestedMinutes: number;
+  createdAt: string;
 };
 
 type WorkoutCardItem = {
@@ -29,6 +36,7 @@ type GeneratedWorkout = {
 const COACH_SYSTEM_PROMPT = [
   "You are an elite, supportive swimming coach for Aura Swimming Hub.",
   "Generate a precise daily set tailored to the swimmer's level, confidence, training history, water treading ability, and current goals.",
+  "Use recent learner feedback as training memory. If feedback says the set felt too long, too hard, or too easy, adjust the next plan accordingly.",
   "For beginner or fearful swimmers, cap continuous distances at 25m and avoid 50m/100m continuous repeats; use short repeats with rest.",
   "Never assign 100m continuous swims for beginners; keep drills simple, low volume, and confidence-building.",
   "For beginners, keep total distance conservative (roughly 12.5m per requested minute; never above 600m).",
@@ -151,6 +159,17 @@ function sanitizeJsonString(payload: string): string {
   }
 
   return output;
+}
+
+function summarizeFeedback(feedback: FeedbackSummary[]): { positiveCount: number; negativeCount: number; notes: string[] } {
+  const positiveCount = feedback.filter((item) => item.rating === "up").length;
+  const negativeCount = feedback.filter((item) => item.rating === "down").length;
+  const notes = feedback
+    .map((item) => item.note?.trim() ?? "")
+    .filter(Boolean)
+    .slice(0, 5);
+
+  return { positiveCount, negativeCount, notes };
 }
 
 function isRetryableGeminiError(error: unknown): boolean {
@@ -640,6 +659,7 @@ async function fetchWorkoutFromLlm(input: {
   requestedMinutes: number;
   swimmerProfile: SwimmerProfile | null;
   history: ReturnType<typeof summarizeBookingHistory>;
+  feedback: ReturnType<typeof summarizeFeedback>;
 }): Promise<GeneratedWorkout> {
   const apiKey = process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -677,6 +697,7 @@ async function fetchWorkoutFromLlm(input: {
                 requested_minutes: input.requestedMinutes,
                 swimmer_profile: input.swimmerProfile ?? null,
                 booking_history: input.history,
+                recent_feedback: input.feedback,
               }),
           }],
         }],
@@ -767,6 +788,15 @@ export async function POST(request: NextRequest) {
 
     const resolvedSwimmerProfile = manualProfile ?? null;
     const history = summarizeBookingHistory([]);
+    const userFeedbackSnapshot = await adminRtdb.ref(`coachFeedback/${uid}`).get();
+    const userFeedbackData = userFeedbackSnapshot.exists()
+      ? (userFeedbackSnapshot.val() as Record<string, Omit<WorkoutFeedback, "id">>)
+      : {};
+    const recentFeedback = Object.entries(userFeedbackData)
+      .map(([id, item]) => ({ id, ...item }))
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 5);
+    const feedbackSummary = summarizeFeedback(recentFeedback);
 
     if (!geminiKey) {
       return NextResponse.json(
@@ -799,6 +829,7 @@ export async function POST(request: NextRequest) {
         requestedMinutes,
         swimmerProfile: profile?.swimmerProfile ?? null,
         history: liveHistory,
+        feedback: feedbackSummary,
       });
 
       return NextResponse.json({
@@ -812,6 +843,7 @@ export async function POST(request: NextRequest) {
       requestedMinutes,
       swimmerProfile: resolvedSwimmerProfile,
       history,
+      feedback: feedbackSummary,
     });
 
     return NextResponse.json({
