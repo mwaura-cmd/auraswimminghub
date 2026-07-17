@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Check, LoaderCircle, Trophy, CalendarDays, ReceiptText, Clock3, Sparkles, ThumbsDown, ThumbsUp } from "lucide-react";
+import { Check, LoaderCircle, Trophy, CalendarDays, ReceiptText, Clock3, Sparkles, ThumbsDown, ThumbsUp, Send } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/components/providers/auth-provider";
@@ -11,6 +11,24 @@ import { BILLING_CYCLES, BILLING_CYCLE_LABEL, formatKes } from "@/lib/pricing";
 import { saveWorkoutFeedback, subscribeBookings, subscribeUserProfile } from "@/lib/realtimedb";
 import { getFirebaseAuth } from "@/lib/firebase";
 import { AttendanceStatus, Booking, GeneratedWorkout, PlatformUser, SwimLevel, SwimmerProfile } from "@/lib/types";
+
+type CoachReply = {
+  reply: string;
+  follow_up_questions: string[];
+  suggested_action: "generate_workout" | "clarify" | "adjust_workout";
+};
+
+type GenerateSetResponse = {
+  workout?: GeneratedWorkout;
+  error?: string;
+  coachReply?: CoachReply;
+};
+
+type CoachMessage = {
+  id: string;
+  role: "user" | "assistant";
+  text: string;
+};
 
 function toAttendanceStatus(status?: AttendanceStatus): AttendanceStatus {
   return status ?? "pending";
@@ -50,6 +68,11 @@ export function LearnerDashboard() {
   const [feedbackBusy, setFeedbackBusy] = useState(false);
   const [feedbackNote, setFeedbackNote] = useState("");
   const [feedbackStatus, setFeedbackStatus] = useState("");
+  const [coachMessages, setCoachMessages] = useState<CoachMessage[]>([
+    { id: "coach-welcome", role: "assistant", text: "Ask Coach Assist anything about your next set, pacing, breathing, or confidence in the water." },
+  ]);
+  const [coachDraft, setCoachDraft] = useState("");
+  const [coachBusy, setCoachBusy] = useState(false);
   const [completedItems, setCompletedItems] = useState<Record<string, boolean>>({});
   const [bookingError, setBookingError] = useState("");
   const [profileError, setProfileError] = useState("");
@@ -442,6 +465,73 @@ export function LearnerDashboard() {
     }
   };
 
+  const handleCoachMessage = async () => {
+    const text = coachDraft.trim();
+    if (!text) {
+      return;
+    }
+
+    setCoachBusy(true);
+    setCoachMessages((current) => [...current, { id: `user-${Date.now()}`, role: "user", text }]);
+    setCoachDraft("");
+    setWorkoutError("");
+
+    try {
+      const currentAuth = getFirebaseAuth();
+      const currentUser = currentAuth?.currentUser;
+
+      if (!currentAuth || !currentUser) {
+        throw new Error("You must be signed in to chat with Coach Assist.");
+      }
+
+      const token = await currentUser.getIdToken();
+      const response = await fetch("/api/generate-set", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          requestedMinutes: manualSwimmerProfile?.sessionTimeLimitMinutes ?? 40,
+          swimmerProfile: manualSwimmerProfile,
+          coachMessage: text,
+        }),
+      });
+
+      const data = (await response.json()) as GenerateSetResponse;
+      if (!response.ok) {
+        throw new Error(data.error ?? "Could not reach Coach Assist.");
+      }
+
+      if (data.workout) {
+        setWorkout(data.workout);
+        setCompletedItems({});
+      }
+
+      const reply = data.coachReply?.reply?.trim() || "Tell me what you want to change and I’ll tune the set.";
+      const followUps = data.coachReply?.follow_up_questions?.filter(Boolean) ?? [];
+      setCoachMessages((current) => [
+        ...current,
+        {
+          id: `assistant-${Date.now()}`,
+          role: "assistant",
+          text: followUps.length > 0 ? `${reply} ${followUps.join(" ")}` : reply,
+        },
+      ]);
+    } catch (error) {
+      setCoachMessages((current) => [
+        ...current,
+        {
+          id: `assistant-error-${Date.now()}`,
+          role: "assistant",
+          text: error instanceof Error ? error.message : "Coach Assist could not respond right now.",
+        },
+      ]);
+    } finally {
+      setCoachBusy(false);
+    }
+  };
+
   const renderWorkoutSection = (title: string, items: { description: string; distance?: string; duration?: string; reps?: number }[], tone: string) => {
     if (items.length === 0) {
       return null;
@@ -660,6 +750,52 @@ export function LearnerDashboard() {
                 )}
               </AnimatePresence>
             </div>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-teal-500/25 bg-black/40 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.24em] text-teal-300">Coach Assist Chat</p>
+              <h2 className="mt-1 text-2xl text-teal-50">Talk to the agent</h2>
+            </div>
+            <span className="rounded-full border border-teal-500/30 bg-teal-500/10 px-3 py-1 text-xs text-teal-50">Conversational mode</span>
+          </div>
+
+          <div className="mt-4 max-h-72 space-y-3 overflow-y-auto rounded-2xl border border-teal-500/15 bg-black/30 p-4">
+            {coachMessages.map((message) => (
+              <div
+                key={message.id}
+                className={`max-w-[92%] rounded-2xl px-4 py-3 text-sm ${message.role === "user" ? "ml-auto bg-teal-500/20 text-teal-50" : "bg-white/5 text-teal-50/90"}`}
+              >
+                {message.text}
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+            <input
+              type="text"
+              value={coachDraft}
+              onChange={(event) => setCoachDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  void handleCoachMessage();
+                }
+              }}
+              placeholder="Ask for a harder set, more rest, breathing help, or a custom change..."
+              className="flex-1 rounded-xl border border-teal-500/20 bg-teal-950/20 px-4 py-3 text-teal-50 outline-none transition placeholder:text-teal-100/35 hover:bg-teal-950/35 focus:border-teal-400 focus:bg-teal-950/35"
+            />
+            <button
+              type="button"
+              onClick={() => void handleCoachMessage()}
+              disabled={coachBusy || !coachDraft.trim()}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal-400 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-teal-300 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {coachBusy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              {coachBusy ? "Thinking..." : "Send"}
+            </button>
           </div>
         </div>
 

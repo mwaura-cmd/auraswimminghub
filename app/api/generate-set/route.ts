@@ -6,6 +6,13 @@ import { Booking, PlatformUser, SwimmerProfile, WorkoutFeedback } from "@/lib/ty
 type GenerateSetRequest = {
   requestedMinutes?: number;
   swimmerProfile?: Partial<SwimmerProfile>;
+  coachMessage?: string;
+};
+
+type CoachReplyPayload = {
+  reply: string;
+  follow_up_questions: string[];
+  suggested_action: "generate_workout" | "clarify" | "adjust_workout";
 };
 
 type FeedbackSummary = {
@@ -69,6 +76,16 @@ const COACH_PLAN_PROMPT = [
   "Return ONLY valid JSON with keys: training_goal, intensity, beginner_guardrails, session_shape, memory_adjustments, success_checks.",
   "Intensity must be one of easy, moderate, or challenging.",
   "Keep each array concise and practical.",
+  "No markdown, no commentary, no extra keys.",
+].join(" ");
+
+const COACH_CHAT_PROMPT = [
+  "You are Coach Assist, a conversational swimming coach for Aura Swimming Hub.",
+  "Answer the learner naturally and directly.",
+  "If the learner asks for changes, explain the adjustment and optionally recommend a clearer next step.",
+  "If the message is too vague, ask up to 3 short follow-up questions.",
+  "Return ONLY valid JSON with keys: reply, follow_up_questions, suggested_action.",
+  "suggested_action must be one of generate_workout, clarify, adjust_workout.",
   "No markdown, no commentary, no extra keys.",
 ].join(" ");
 
@@ -193,6 +210,20 @@ function summarizeFeedback(feedback: FeedbackSummary[]): { positiveCount: number
   return { positiveCount, negativeCount, notes };
 }
 
+function normalizeCoachReply(payload: Record<string, unknown>): CoachReplyPayload {
+  const action = String(payload.suggested_action ?? "clarify");
+  const allowedActions: CoachReplyPayload["suggested_action"][] = ["generate_workout", "clarify", "adjust_workout"];
+  return {
+    reply: String(payload.reply ?? "Tell me what you want to tweak in the set.").trim(),
+    follow_up_questions: Array.isArray(payload.follow_up_questions)
+      ? payload.follow_up_questions.map((value) => String(value).trim()).filter(Boolean).slice(0, 3)
+      : [],
+    suggested_action: allowedActions.includes(action as CoachReplyPayload["suggested_action"])
+      ? (action as CoachReplyPayload["suggested_action"])
+      : "clarify",
+  };
+}
+
 function buildAgentContext(input: {
   requestedMinutes: number;
   swimmerProfile: SwimmerProfile | null;
@@ -246,6 +277,37 @@ async function buildCoachPlan(input: {
       ? parsed.success_checks.map((value) => String(value).trim()).filter(Boolean).slice(0, 5)
       : [],
   };
+}
+
+async function buildCoachReply(input: {
+  model: ReturnType<GoogleGenerativeAI["getGenerativeModel"]>;
+  context: ReturnType<typeof buildAgentContext>;
+  coachMessage: string;
+  workout: GeneratedWorkout | null;
+  plan: CoachPlan;
+}): Promise<CoachReplyPayload> {
+  const result = await generateWithRetry(input.model, {
+    contents: [{
+      role: "user",
+      parts: [{
+        text: COACH_CHAT_PROMPT + "\n\n" + JSON.stringify({
+          coach_message: input.coachMessage,
+          current_workout: input.workout,
+          plan: input.plan,
+          learner_context: input.context,
+        }),
+      }],
+    }],
+    generationConfig: {
+      temperature: 0.3,
+      maxOutputTokens: 400,
+      responseMimeType: "application/json",
+    },
+  });
+
+  const content = getGeminiResponseText(result.response as GeminiTextResponse);
+  const parsed = parseJsonPayload(extractJsonPayload(content));
+  return normalizeCoachReply(parsed);
 }
 
 function isRetryableGeminiError(error: unknown): boolean {
@@ -868,6 +930,7 @@ export async function POST(request: NextRequest) {
     const body = (await request.json().catch(() => ({}))) as GenerateSetRequest;
     const requestedMinutes = clampTrainingMinutes(body.requestedMinutes);
     const manualProfile = normalizeSwimmerProfile(body.swimmerProfile);
+    const coachMessage = typeof body.coachMessage === "string" ? body.coachMessage.trim() : "";
     const geminiKey = process.env.GEMINI_API_KEY?.trim() ?? process.env.OPENAI_API_KEY?.trim() ?? "";
 
     const resolvedSwimmerProfile = manualProfile ?? null;
@@ -890,6 +953,10 @@ export async function POST(request: NextRequest) {
         { status: 500 },
       );
     }
+
+    const modelName = process.env.OPENAI_MODEL?.trim() || "gemini-2.5-flash";
+    const genAI = new GoogleGenerativeAI(geminiKey);
+    const model = genAI.getGenerativeModel({ model: modelName });
 
     if (!manualProfile) {
       const profileSnapshot = await adminRtdb.ref(`users/${uid}`).get();
@@ -916,6 +983,37 @@ export async function POST(request: NextRequest) {
         feedback: feedbackSummary,
       });
 
+      if (coachMessage) {
+        const plan = await buildCoachPlan({
+          model,
+          context: buildAgentContext({
+            requestedMinutes,
+            swimmerProfile: profile?.swimmerProfile ?? null,
+            history: liveHistory,
+            feedback: feedbackSummary,
+          }),
+        });
+        const coachReply = await buildCoachReply({
+          model,
+          context: buildAgentContext({
+            requestedMinutes,
+            swimmerProfile: profile?.swimmerProfile ?? null,
+            history: liveHistory,
+            feedback: feedbackSummary,
+          }),
+          coachMessage,
+          workout,
+          plan,
+        });
+
+        return NextResponse.json({
+          requestedMinutes,
+          cappedAtMinutes: 60,
+          workout,
+          coachReply,
+        });
+      }
+
       return NextResponse.json({
         requestedMinutes,
         cappedAtMinutes: 60,
@@ -929,6 +1027,37 @@ export async function POST(request: NextRequest) {
       history,
       feedback: feedbackSummary,
     });
+
+    if (coachMessage) {
+      const plan = await buildCoachPlan({
+        model,
+        context: buildAgentContext({
+          requestedMinutes,
+          swimmerProfile: resolvedSwimmerProfile,
+          history,
+          feedback: feedbackSummary,
+        }),
+      });
+      const coachReply = await buildCoachReply({
+        model,
+        context: buildAgentContext({
+          requestedMinutes,
+          swimmerProfile: resolvedSwimmerProfile,
+          history,
+          feedback: feedbackSummary,
+        }),
+        coachMessage,
+        workout,
+        plan,
+      });
+
+      return NextResponse.json({
+        requestedMinutes,
+        cappedAtMinutes: 60,
+        workout,
+        coachReply,
+      });
+    }
 
     return NextResponse.json({
       requestedMinutes,
