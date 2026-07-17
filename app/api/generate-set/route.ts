@@ -22,6 +22,15 @@ type WorkoutCardItem = {
   reps?: number;
 };
 
+type CoachPlan = {
+  training_goal: string;
+  intensity: "easy" | "moderate" | "challenging";
+  beginner_guardrails: string[];
+  session_shape: string[];
+  memory_adjustments: string[];
+  success_checks: string[];
+};
+
 type GeneratedWorkout = {
   workout_title: string;
   focus: string;
@@ -54,6 +63,18 @@ const COACH_SYSTEM_PROMPT = [
 
 const OPENAI_TIMEOUT_MS = 25000;
 const BEGINNER_MAX_DISTANCE_PER_MIN = 12.5;
+const COACH_PLAN_PROMPT = [
+  "You are planning the next swim session for Aura Swimming Hub.",
+  "Use the profile, booking history, and learner feedback to decide the session strategy before writing the workout.",
+  "Return ONLY valid JSON with keys: training_goal, intensity, beginner_guardrails, session_shape, memory_adjustments, success_checks.",
+  "Intensity must be one of easy, moderate, or challenging.",
+  "Keep each array concise and practical.",
+  "No markdown, no commentary, no extra keys.",
+].join(" ");
+
+function extractPlanText(plan: CoachPlan): string {
+  return JSON.stringify(plan);
+}
 
 function extractJsonPayload(text: string): string {
   const stripped = text.replace(/```json/gi, "").replace(/```/g, "").trim();
@@ -170,6 +191,61 @@ function summarizeFeedback(feedback: FeedbackSummary[]): { positiveCount: number
     .slice(0, 5);
 
   return { positiveCount, negativeCount, notes };
+}
+
+function buildAgentContext(input: {
+  requestedMinutes: number;
+  swimmerProfile: SwimmerProfile | null;
+  history: ReturnType<typeof summarizeBookingHistory>;
+  feedback: ReturnType<typeof summarizeFeedback>;
+}) {
+  return {
+    requested_minutes: input.requestedMinutes,
+    swimmer_profile: input.swimmerProfile ?? null,
+    booking_history: input.history,
+    recent_feedback: input.feedback,
+  };
+}
+
+async function buildCoachPlan(input: {
+  model: ReturnType<GoogleGenerativeAI["getGenerativeModel"]>;
+  context: ReturnType<typeof buildAgentContext>;
+}): Promise<CoachPlan> {
+  const result = await generateWithRetry(input.model, {
+    contents: [{
+      role: "user",
+      parts: [{
+        text: COACH_PLAN_PROMPT + "\n\n" + JSON.stringify(input.context),
+      }],
+    }],
+    generationConfig: {
+      temperature: 0.2,
+      maxOutputTokens: 500,
+      responseMimeType: "application/json",
+    },
+  });
+
+  const content = getGeminiResponseText(result.response as GeminiTextResponse);
+  const parsed = parseJsonPayload(extractJsonPayload(content));
+
+  return {
+    training_goal: String(parsed.training_goal ?? "confidence and control"),
+    intensity: ["easy", "moderate", "challenging"].includes(String(parsed.intensity))
+      ? (String(parsed.intensity) as CoachPlan["intensity"])
+      : "moderate",
+    beginner_guardrails: Array.isArray(parsed.beginner_guardrails)
+      ? parsed.beginner_guardrails.map((value) => String(value).trim()).filter(Boolean).slice(0, 5)
+      : [],
+    session_shape: Array.isArray(parsed.session_shape)
+      ? parsed.session_shape.map((value) => String(value).trim()).filter(Boolean).slice(0, 6)
+      : [],
+    memory_adjustments: Array.isArray(parsed.memory_adjustments)
+      ? parsed.memory_adjustments.map((value) => String(value).trim()).filter(Boolean).slice(0, 5)
+      : [],
+    success_checks: Array.isArray(parsed.success_checks)
+      ? parsed.success_checks.map((value) => String(value).trim()).filter(Boolean).slice(0, 5)
+      : [],
+  };
 }
 
 function isRetryableGeminiError(error: unknown): boolean {
@@ -676,6 +752,12 @@ async function fetchWorkoutFromLlm(input: {
   const maxMinutes = Math.min(60, input.requestedMinutes);
   const preferKeepTreading = Boolean(input.swimmerProfile?.fearOfDeepWater) ||
     (input.swimmerProfile?.waterTreadingCapabilitySeconds ?? 0) < 60;
+  const agentContext = buildAgentContext(input);
+
+  const coachPlan = await buildCoachPlan({
+    model,
+    context: agentContext,
+  });
 
   try {
     let lastEstimate: number | null = null;
@@ -691,14 +773,11 @@ async function fetchWorkoutFromLlm(input: {
           role: "user",
           parts: [{
             text: COACH_SYSTEM_PROMPT +
+              "\n\nAgent plan: " +
+              extractPlanText(coachPlan) +
               (retryNote ? `\n\n${retryNote}` : "") +
               "\n\n" +
-              JSON.stringify({
-                requested_minutes: input.requestedMinutes,
-                swimmer_profile: input.swimmerProfile ?? null,
-                booking_history: input.history,
-                recent_feedback: input.feedback,
-              }),
+              JSON.stringify(agentContext),
           }],
         }],
         generationConfig: {
@@ -733,7 +812,12 @@ async function fetchWorkoutFromLlm(input: {
           return trimWorkoutToMinutes(normalized, maxMinutes, preferKeepTreading, input.swimmerProfile);
         }
 
-        return ensureWorkoutMatchesMinutes(normalized, maxMinutes, preferKeepTreading, input.swimmerProfile);
+        const finalized = ensureWorkoutMatchesMinutes(normalized, maxMinutes, preferKeepTreading, input.swimmerProfile);
+        if (finalized.estimatedMinutes > maxMinutes || finalized.estimatedMinutes < Math.max(15, maxMinutes - 2)) {
+          return ensureWorkoutMatchesMinutes(finalized, maxMinutes, preferKeepTreading, input.swimmerProfile);
+        }
+
+        return finalized;
       } catch (err) {
         console.error(err);
         console.error("LLM raw response length:", content.length);
