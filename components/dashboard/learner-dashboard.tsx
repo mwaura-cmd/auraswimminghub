@@ -13,6 +13,8 @@ import { getFirebaseAuth } from "@/lib/firebase";
 import { AttendanceStatus, Booking, GeneratedWorkout, PlatformUser, SwimLevel, SwimmerProfile } from "@/lib/types";
 
 type CoachReply = {
+  summary: string;
+  solution_points: string[];
   reply: string;
   follow_up_questions: string[];
   suggested_action: "generate_workout" | "clarify" | "adjust_workout";
@@ -509,13 +511,15 @@ export function LearnerDashboard() {
       }
 
       const reply = data.coachReply?.reply?.trim() || "Tell me what you want to change and I’ll tune the set.";
+      const summary = data.coachReply?.summary?.trim() || reply;
+      const solutionPoints = data.coachReply?.solution_points?.filter(Boolean) ?? [];
       const followUps = data.coachReply?.follow_up_questions?.filter(Boolean) ?? [];
       setCoachMessages((current) => [
         ...current,
         {
           id: `assistant-${Date.now()}`,
           role: "assistant",
-          text: followUps.length > 0 ? `${reply} ${followUps.join(" ")}` : reply,
+          text: [summary, ...solutionPoints, ...(followUps.length > 0 ? [followUps.join(" ")] : [])].join("\n\n"),
         },
       ]);
     } catch (error) {

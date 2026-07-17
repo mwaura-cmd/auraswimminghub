@@ -10,6 +10,8 @@ type GenerateSetRequest = {
 };
 
 type CoachReplyPayload = {
+  summary: string;
+  solution_points: string[];
   reply: string;
   follow_up_questions: string[];
   suggested_action: "generate_workout" | "clarify" | "adjust_workout";
@@ -82,9 +84,11 @@ const COACH_PLAN_PROMPT = [
 const COACH_CHAT_PROMPT = [
   "You are Coach Assist, a conversational swimming coach for Aura Swimming Hub.",
   "Answer the learner naturally and directly.",
-  "If the learner asks for changes, explain the adjustment and optionally recommend a clearer next step.",
+  "You must provide an actual solution, not a short acknowledgement.",
+  "Always include: a concise summary, 2 to 4 concrete solution points, and a clear next step.",
+  "If the learner asks for changes, explain the adjustment and recommend the workout change.",
   "If the message is too vague, ask up to 3 short follow-up questions.",
-  "Return ONLY valid JSON with keys: reply, follow_up_questions, suggested_action.",
+  "Return ONLY valid JSON with keys: summary, solution_points, reply, follow_up_questions, suggested_action.",
   "suggested_action must be one of generate_workout, clarify, adjust_workout.",
   "No markdown, no commentary, no extra keys.",
 ].join(" ");
@@ -213,8 +217,15 @@ function summarizeFeedback(feedback: FeedbackSummary[]): { positiveCount: number
 function normalizeCoachReply(payload: Record<string, unknown>): CoachReplyPayload {
   const action = String(payload.suggested_action ?? "clarify");
   const allowedActions: CoachReplyPayload["suggested_action"][] = ["generate_workout", "clarify", "adjust_workout"];
+  const solutionPoints = Array.isArray(payload.solution_points)
+    ? payload.solution_points.map((value) => String(value).trim()).filter(Boolean).slice(0, 4)
+    : [];
+  const summary = String(payload.summary ?? payload.reply ?? "Here is the best adjustment for your next set.").trim();
+  const reply = String(payload.reply ?? summary).trim();
   return {
-    reply: String(payload.reply ?? "Tell me what you want to tweak in the set.").trim(),
+    summary,
+    solution_points: solutionPoints.length > 0 ? solutionPoints : [summary],
+    reply,
     follow_up_questions: Array.isArray(payload.follow_up_questions)
       ? payload.follow_up_questions.map((value) => String(value).trim()).filter(Boolean).slice(0, 3)
       : [],
@@ -248,6 +259,8 @@ function fallbackCoachPlan(input: {
 function fallbackCoachReply(coachMessage: string): CoachReplyPayload {
   if (!coachMessage.trim()) {
     return {
+      summary: "I need a bit more detail to tune the set properly.",
+      solution_points: ["Tell me whether you want more rest, more challenge, or more breathing support."],
       reply: "Tell me what you want to change and I’ll tune the set.",
       follow_up_questions: ["Do you want more rest, more challenge, or more breathing support?"],
       suggested_action: "clarify",
@@ -255,8 +268,10 @@ function fallbackCoachReply(coachMessage: string): CoachReplyPayload {
   }
 
   return {
+    summary: "I can shape the next set around that request.",
+    solution_points: ["I’ll increase the challenge by tightening rest or adding longer repeats.", "I’ll keep the structure safe so the workout still matches your level.", "I’ll adjust the next set once you confirm whether you want harder, longer, or both."],
     reply: "Got it. I’ll adjust the next set around that.",
-    follow_up_questions: ["Should I make it easier, harder, or longer?"],
+    follow_up_questions: ["Should I make it easier, harder, longer, or a mix of the three?"],
     suggested_action: "adjust_workout",
   };
 }
@@ -353,7 +368,11 @@ async function buildCoachReply(input: {
 
     const content = getGeminiResponseText(result.response as GeminiTextResponse);
     const parsed = parseJsonPayload(extractJsonPayload(content));
-    return normalizeCoachReply(parsed);
+    const normalized = normalizeCoachReply(parsed);
+    if (normalized.reply.length < 24 || normalized.solution_points.length === 0) {
+      return fallbackCoachReply(input.coachMessage);
+    }
+    return normalized;
   } catch (error) {
     console.warn("Coach reply generation failed; using fallback reply.", error);
     return fallbackCoachReply(input.coachMessage);
