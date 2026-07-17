@@ -224,6 +224,43 @@ function normalizeCoachReply(payload: Record<string, unknown>): CoachReplyPayloa
   };
 }
 
+function fallbackCoachPlan(input: {
+  swimmerProfile: SwimmerProfile | null;
+  feedback: ReturnType<typeof summarizeFeedback>;
+}): CoachPlan {
+  const beginnerFriendly = shouldUseBeginnerPace(input.swimmerProfile);
+  const feedbackTone = input.feedback.negativeCount > input.feedback.positiveCount ? "reduce intensity" : "keep structure";
+
+  return {
+    training_goal: beginnerFriendly ? "confidence and control" : "steady progression",
+    intensity: beginnerFriendly ? "easy" : "moderate",
+    beginner_guardrails: beginnerFriendly
+      ? ["Keep repeats short", "Prioritize breathing control", "Use generous rest"]
+      : ["Keep form clean", "Avoid ego pacing"],
+    session_shape: ["Warm up", "Main work", "Treading", "Cool down"],
+    memory_adjustments: input.feedback.notes.length > 0
+      ? [`Learner feedback suggests to ${feedbackTone}`]
+      : ["Use recent profile and booking history"],
+    success_checks: ["Finish within target minutes", "Keep the swimmer confident", "Leave energy for next session"],
+  };
+}
+
+function fallbackCoachReply(coachMessage: string): CoachReplyPayload {
+  if (!coachMessage.trim()) {
+    return {
+      reply: "Tell me what you want to change and I’ll tune the set.",
+      follow_up_questions: ["Do you want more rest, more challenge, or more breathing support?"],
+      suggested_action: "clarify",
+    };
+  }
+
+  return {
+    reply: "Got it. I’ll adjust the next set around that.",
+    follow_up_questions: ["Should I make it easier, harder, or longer?"],
+    suggested_action: "adjust_workout",
+  };
+}
+
 function buildAgentContext(input: {
   requestedMinutes: number;
   swimmerProfile: SwimmerProfile | null;
@@ -242,41 +279,49 @@ async function buildCoachPlan(input: {
   model: ReturnType<GoogleGenerativeAI["getGenerativeModel"]>;
   context: ReturnType<typeof buildAgentContext>;
 }): Promise<CoachPlan> {
-  const result = await generateWithRetry(input.model, {
-    contents: [{
-      role: "user",
-      parts: [{
-        text: COACH_PLAN_PROMPT + "\n\n" + JSON.stringify(input.context),
+  try {
+    const result = await generateWithRetry(input.model, {
+      contents: [{
+        role: "user",
+        parts: [{
+          text: COACH_PLAN_PROMPT + "\n\n" + JSON.stringify(input.context),
+        }],
       }],
-    }],
-    generationConfig: {
-      temperature: 0.2,
-      maxOutputTokens: 500,
-      responseMimeType: "application/json",
-    },
-  });
+      generationConfig: {
+        temperature: 0.2,
+        maxOutputTokens: 500,
+        responseMimeType: "application/json",
+      },
+    });
 
-  const content = getGeminiResponseText(result.response as GeminiTextResponse);
-  const parsed = parseJsonPayload(extractJsonPayload(content));
+    const content = getGeminiResponseText(result.response as GeminiTextResponse);
+    const parsed = parseJsonPayload(extractJsonPayload(content));
 
-  return {
-    training_goal: String(parsed.training_goal ?? "confidence and control"),
-    intensity: ["easy", "moderate", "challenging"].includes(String(parsed.intensity))
-      ? (String(parsed.intensity) as CoachPlan["intensity"])
-      : "moderate",
-    beginner_guardrails: Array.isArray(parsed.beginner_guardrails)
-      ? parsed.beginner_guardrails.map((value) => String(value).trim()).filter(Boolean).slice(0, 5)
-      : [],
-    session_shape: Array.isArray(parsed.session_shape)
-      ? parsed.session_shape.map((value) => String(value).trim()).filter(Boolean).slice(0, 6)
-      : [],
-    memory_adjustments: Array.isArray(parsed.memory_adjustments)
-      ? parsed.memory_adjustments.map((value) => String(value).trim()).filter(Boolean).slice(0, 5)
-      : [],
-    success_checks: Array.isArray(parsed.success_checks)
-      ? parsed.success_checks.map((value) => String(value).trim()).filter(Boolean).slice(0, 5)
-      : [],
-  };
+    return {
+      training_goal: String(parsed.training_goal ?? "confidence and control"),
+      intensity: ["easy", "moderate", "challenging"].includes(String(parsed.intensity))
+        ? (String(parsed.intensity) as CoachPlan["intensity"])
+        : "moderate",
+      beginner_guardrails: Array.isArray(parsed.beginner_guardrails)
+        ? parsed.beginner_guardrails.map((value) => String(value).trim()).filter(Boolean).slice(0, 5)
+        : [],
+      session_shape: Array.isArray(parsed.session_shape)
+        ? parsed.session_shape.map((value) => String(value).trim()).filter(Boolean).slice(0, 6)
+        : [],
+      memory_adjustments: Array.isArray(parsed.memory_adjustments)
+        ? parsed.memory_adjustments.map((value) => String(value).trim()).filter(Boolean).slice(0, 5)
+        : [],
+      success_checks: Array.isArray(parsed.success_checks)
+        ? parsed.success_checks.map((value) => String(value).trim()).filter(Boolean).slice(0, 5)
+        : [],
+    };
+  } catch (error) {
+    console.warn("Coach plan generation failed; falling back to local plan.", error);
+    return fallbackCoachPlan({
+      swimmerProfile: input.context.swimmer_profile,
+      feedback: input.context.recent_feedback,
+    });
+  }
 }
 
 async function buildCoachReply(input: {
@@ -286,28 +331,33 @@ async function buildCoachReply(input: {
   workout: GeneratedWorkout | null;
   plan: CoachPlan;
 }): Promise<CoachReplyPayload> {
-  const result = await generateWithRetry(input.model, {
-    contents: [{
-      role: "user",
-      parts: [{
-        text: COACH_CHAT_PROMPT + "\n\n" + JSON.stringify({
-          coach_message: input.coachMessage,
-          current_workout: input.workout,
-          plan: input.plan,
-          learner_context: input.context,
-        }),
+  try {
+    const result = await generateWithRetry(input.model, {
+      contents: [{
+        role: "user",
+        parts: [{
+          text: COACH_CHAT_PROMPT + "\n\n" + JSON.stringify({
+            coach_message: input.coachMessage,
+            current_workout: input.workout,
+            plan: input.plan,
+            learner_context: input.context,
+          }),
+        }],
       }],
-    }],
-    generationConfig: {
-      temperature: 0.3,
-      maxOutputTokens: 400,
-      responseMimeType: "application/json",
-    },
-  });
+      generationConfig: {
+        temperature: 0.3,
+        maxOutputTokens: 400,
+        responseMimeType: "application/json",
+      },
+    });
 
-  const content = getGeminiResponseText(result.response as GeminiTextResponse);
-  const parsed = parseJsonPayload(extractJsonPayload(content));
-  return normalizeCoachReply(parsed);
+    const content = getGeminiResponseText(result.response as GeminiTextResponse);
+    const parsed = parseJsonPayload(extractJsonPayload(content));
+    return normalizeCoachReply(parsed);
+  } catch (error) {
+    console.warn("Coach reply generation failed; using fallback reply.", error);
+    return fallbackCoachReply(input.coachMessage);
+  }
 }
 
 function isRetryableGeminiError(error: unknown): boolean {
